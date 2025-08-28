@@ -71,50 +71,100 @@ CREATE INDEX IF NOT EXISTS idx_spark_point_redemptions_status ON public.spark_po
 CREATE INDEX IF NOT EXISTS idx_spark_point_rewards_active ON public.spark_point_rewards(is_active);
 CREATE INDEX IF NOT EXISTS idx_spark_point_rules_active ON public.spark_point_rules(is_active);
 
--- Function to update user spark point balance
+-- Function to update user spark point balance when points are awarded
 CREATE OR REPLACE FUNCTION update_spark_point_balance()
-RETURNS TRIGGER AS $$
+RETURNS TRIGGER AS $
 BEGIN
-  -- Insert or update balance record
-  INSERT INTO public.spark_point_balances (user_id, total_points, available_points)
-  VALUES (
-    NEW.user_id,
-    NEW.points,
-    NEW.points
-  )
-  ON CONFLICT (user_id) 
-  DO UPDATE SET
-    total_points = spark_point_balances.total_points + NEW.points,
-    available_points = spark_point_balances.available_points + NEW.points,
-    updated_at = NOW();
-  
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
--- Function to handle spark point redemptions
-CREATE OR REPLACE FUNCTION process_spark_point_redemption()
-RETURNS TRIGGER AS $$
-BEGIN
-  -- Only process when status changes to 'approved'
-  IF NEW.status = 'approved' AND (OLD.status IS NULL OR OLD.status != 'approved') THEN
-    -- Update user balance
+  -- Only process positive point awards (not deductions)
+  IF NEW.points > 0 THEN
+    -- Insert or update balance record
+    INSERT INTO public.spark_point_balances (user_id, total_points, available_points)
+    VALUES (
+      NEW.user_id,
+      NEW.points,
+      NEW.points
+    )
+    ON CONFLICT (user_id) 
+    DO UPDATE SET
+      total_points = spark_point_balances.total_points + NEW.points,
+      available_points = spark_point_balances.available_points + NEW.points,
+      updated_at = NOW();
+  ELSE
+    -- Handle point deductions (negative points)
     UPDATE public.spark_point_balances 
     SET 
-      available_points = available_points - NEW.points_spent,
-      redeemed_points = redeemed_points + NEW.points_spent,
+      available_points = GREATEST(0, available_points + NEW.points),
       updated_at = NOW()
     WHERE user_id = NEW.user_id;
-    
-    -- Update reward stock if applicable
-    UPDATE public.spark_point_rewards 
-    SET stock_quantity = stock_quantity - 1
-    WHERE id = NEW.reward_id AND stock_quantity > 0;
   END IF;
   
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql;
+$ LANGUAGE plpgsql;
+
+-- Function to handle spark point redemptions
+CREATE OR REPLACE FUNCTION process_spark_point_redemption()
+RETURNS TRIGGER AS $
+BEGIN
+  -- Only process when status changes to 'approved'
+  IF NEW.status = 'approved' AND (OLD.status IS NULL OR OLD.status != 'approved') THEN
+    -- Check if user has enough points
+    IF (SELECT available_points FROM public.spark_point_balances WHERE user_id = NEW.user_id) >= NEW.points_spent THEN
+      -- Update user balance
+      UPDATE public.spark_point_balances 
+      SET 
+        available_points = available_points - NEW.points_spent,
+        redeemed_points = redeemed_points + NEW.points_spent,
+        updated_at = NOW()
+      WHERE user_id = NEW.user_id;
+      
+      -- Log the redemption as a negative point entry
+      INSERT INTO public.spark_points (user_id, points, reason, category, reference_id)
+      VALUES (
+        NEW.user_id,
+        -NEW.points_spent,
+        'Reward redemption: ' || (SELECT name FROM public.spark_point_rewards WHERE id = NEW.reward_id),
+        'redemption',
+        NEW.id::text
+      );
+      
+      -- Update reward stock if applicable
+      UPDATE public.spark_point_rewards 
+      SET stock_quantity = stock_quantity - 1
+      WHERE id = NEW.reward_id AND stock_quantity > 0;
+    ELSE
+      -- Insufficient points, cancel the redemption
+      NEW.status = 'cancelled';
+      NEW.notes = COALESCE(NEW.notes, '') || ' [Auto-cancelled: Insufficient points]';
+    END IF;
+  ELSIF NEW.status = 'cancelled' AND OLD.status = 'approved' THEN
+    -- Refund points if redemption is cancelled after approval
+    UPDATE public.spark_point_balances 
+    SET 
+      available_points = available_points + NEW.points_spent,
+      redeemed_points = redeemed_points - NEW.points_spent,
+      updated_at = NOW()
+    WHERE user_id = NEW.user_id;
+    
+    -- Log the refund as a positive point entry
+    INSERT INTO public.spark_points (user_id, points, reason, category, reference_id)
+    VALUES (
+      NEW.user_id,
+      NEW.points_spent,
+      'Redemption refund: ' || (SELECT name FROM public.spark_point_rewards WHERE id = NEW.reward_id),
+      'refund',
+      NEW.id::text
+    );
+    
+    -- Restore reward stock if applicable
+    UPDATE public.spark_point_rewards 
+    SET stock_quantity = stock_quantity + 1
+    WHERE id = NEW.reward_id AND stock_quantity >= 0;
+  END IF;
+  
+  RETURN NEW;
+END;
+$ LANGUAGE plpgsql;
 
 -- Create triggers
 DROP TRIGGER IF EXISTS trigger_update_spark_point_balance ON public.spark_points;
@@ -156,18 +206,36 @@ INSERT INTO public.spark_point_rewards (name, description, cost, category, image
 ('Professional Development Course', 'Access to premium online course of your choice', 2500, 'education', 'https://images.unsplash.com/photo-1434030216411-0b793f4b4173?w=400&q=80', true, -1),
 ('Wellness Package', 'Gym membership or wellness app subscription', 1800, 'wellness', 'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=400&q=80', true, -1);
 
--- Insert sample spark points for existing users
-INSERT INTO public.spark_points (user_id, points, reason, category, reference_id) VALUES
-('33333333-3333-3333-3333-333333333333', 1500, 'Monthly volume milestone achieved', 'performance', 'volume_2024_01'),
-('33333333-3333-3333-3333-333333333333', 250, 'Top Performer badge earned', 'achievement', 'badge_top_performer'),
-('33333333-3333-3333-3333-333333333333', 800, 'Loan closing bonus (8 loans)', 'performance', 'loans_2024_01'),
-('44444444-4444-4444-4444-444444444444', 2000, 'Exceeded $3M monthly volume', 'performance', 'volume_2024_01'),
-('44444444-4444-4444-4444-444444444444', 250, 'Team Leader badge earned', 'achievement', 'badge_team_leader'),
-('44444444-4444-4444-4444-444444444444', 1000, 'Loan closing bonus (10 loans)', 'performance', 'loans_2024_01'),
-('22222222-2222-2222-2222-222222222222', 1000, 'Monthly volume milestone achieved', 'performance', 'volume_2024_01'),
-('22222222-2222-2222-2222-222222222222', 600, 'Loan closing bonus (6 loans)', 'performance', 'loans_2024_01'),
-('11111111-1111-1111-1111-111111111111', 2500, 'Leadership excellence bonus', 'leadership', 'leadership_2024_01'),
-('11111111-1111-1111-1111-111111111111', 500, 'Team development milestone', 'leadership', 'team_dev_2024_01');
+-- Function to safely insert sample data only if users exist
+CREATE OR REPLACE FUNCTION insert_sample_spark_points()
+RETURNS VOID AS $
+DECLARE
+  sample_user_id UUID;
+BEGIN
+  -- Get any existing user ID for sample data
+  SELECT id INTO sample_user_id FROM public.users LIMIT 1;
+  
+  -- Only insert sample data if we have at least one user
+  IF sample_user_id IS NOT NULL THEN
+    -- Insert sample spark points for the first user found
+    INSERT INTO public.spark_points (user_id, points, reason, category, reference_id) VALUES
+    (sample_user_id, 1500, 'Monthly volume milestone achieved', 'performance', 'volume_2024_01'),
+    (sample_user_id, 250, 'Top Performer badge earned', 'achievement', 'badge_top_performer'),
+    (sample_user_id, 800, 'Loan closing bonus (8 loans)', 'performance', 'loans_2024_01'),
+    (sample_user_id, 200, 'Training completion bonus', 'learning', 'training_2024_01'),
+    (sample_user_id, 150, 'Social media engagement', 'content', 'social_2024_01'),
+    (sample_user_id, -500, 'Redeemed: Coffee gift card', 'redemption', 'redemption_001'),
+    (sample_user_id, 300, 'Client referral bonus', 'referral', 'referral_2024_01'),
+    (sample_user_id, 100, 'Weekly activity completion', 'activity', 'weekly_2024_01');
+  END IF;
+END;
+$ LANGUAGE plpgsql;
+
+-- Execute the sample data insertion
+SELECT insert_sample_spark_points();
+
+-- Drop the temporary function
+DROP FUNCTION insert_sample_spark_points();
 
 -- Create view for spark point leaderboard
 CREATE OR REPLACE VIEW spark_point_leaderboard AS
@@ -186,7 +254,7 @@ LEFT JOIN public.spark_point_balances spb ON u.id = spb.user_id
 WHERE u.status = 'active'
 ORDER BY total_points DESC;
 
--- Create function to award spark points
+-- Create function to award spark points with validation
 CREATE OR REPLACE FUNCTION award_spark_points(
   p_user_id UUID,
   p_points INTEGER,
@@ -194,10 +262,21 @@ CREATE OR REPLACE FUNCTION award_spark_points(
   p_category TEXT DEFAULT 'general',
   p_reference_id TEXT DEFAULT NULL,
   p_awarded_by UUID DEFAULT NULL
-) RETURNS public.spark_points AS $$
+) RETURNS public.spark_points AS $
 DECLARE
   result public.spark_points;
 BEGIN
+  -- Validate user exists
+  IF NOT EXISTS (SELECT 1 FROM public.users WHERE id = p_user_id) THEN
+    RAISE EXCEPTION 'User with ID % does not exist', p_user_id;
+  END IF;
+  
+  -- Validate points amount
+  IF p_points = 0 THEN
+    RAISE EXCEPTION 'Points amount cannot be zero';
+  END IF;
+  
+  -- Insert the spark points record (trigger will handle balance update)
   INSERT INTO public.spark_points (
     user_id, points, reason, category, reference_id, awarded_by
   ) VALUES (
@@ -206,18 +285,25 @@ BEGIN
   
   RETURN result;
 END;
-$$ LANGUAGE plpgsql;
+$ LANGUAGE plpgsql;
 
--- Create function to get user spark point summary
+-- Create function to get user spark point summary with detailed logging
 CREATE OR REPLACE FUNCTION get_user_spark_point_summary(p_user_id UUID)
 RETURNS TABLE (
   total_points INTEGER,
   available_points INTEGER,
   redeemed_points INTEGER,
   rank INTEGER,
-  recent_points JSON
-) AS $$
+  recent_points JSON,
+  points_this_month INTEGER,
+  points_this_week INTEGER
+) AS $
 BEGIN
+  -- Ensure user has a balance record
+  INSERT INTO public.spark_point_balances (user_id, total_points, available_points, redeemed_points)
+  VALUES (p_user_id, 0, 0, 0)
+  ON CONFLICT (user_id) DO NOTHING;
+  
   RETURN QUERY
   SELECT 
     COALESCE(spb.total_points, 0) as total_points,
@@ -227,19 +313,38 @@ BEGIN
     COALESCE(
       (SELECT json_agg(
         json_build_object(
+          'id', sp.id,
           'points', sp.points,
           'reason', sp.reason,
           'category', sp.category,
+          'reference_id', sp.reference_id,
+          'awarded_by', sp.awarded_by,
           'created_at', sp.created_at
         ) ORDER BY sp.created_at DESC
       )
       FROM public.spark_points sp 
       WHERE sp.user_id = p_user_id 
-      LIMIT 10), 
+      LIMIT 20), 
       '[]'::json
-    ) as recent_points
+    ) as recent_points,
+    COALESCE(
+      (SELECT SUM(sp.points)
+       FROM public.spark_points sp
+       WHERE sp.user_id = p_user_id 
+       AND sp.points > 0
+       AND sp.created_at >= date_trunc('month', CURRENT_DATE)), 
+      0
+    )::INTEGER as points_this_month,
+    COALESCE(
+      (SELECT SUM(sp.points)
+       FROM public.spark_points sp
+       WHERE sp.user_id = p_user_id 
+       AND sp.points > 0
+       AND sp.created_at >= date_trunc('week', CURRENT_DATE)), 
+      0
+    )::INTEGER as points_this_week
   FROM public.spark_point_balances spb
   LEFT JOIN spark_point_leaderboard spl ON spb.user_id = spl.id
   WHERE spb.user_id = p_user_id;
 END;
-$$ LANGUAGE plpgsql;
+$ LANGUAGE plpgsql;

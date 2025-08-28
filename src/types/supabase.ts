@@ -519,6 +519,7 @@ export type Database = {
           resolved_at: string | null
           resolved_by: string | null
           status: string
+          ticket_number: string
           title: string
           updated_at: string | null
           user_id: string
@@ -539,6 +540,7 @@ export type Database = {
           resolved_at?: string | null
           resolved_by?: string | null
           status?: string
+          ticket_number: string
           title: string
           updated_at?: string | null
           user_id: string
@@ -559,6 +561,7 @@ export type Database = {
           resolved_at?: string | null
           resolved_by?: string | null
           status?: string
+          ticket_number?: string
           title?: string
           updated_at?: string | null
           user_id?: string
@@ -856,6 +859,10 @@ export type Database = {
       }
     }
     Functions: {
+      generate_ticket_number: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
       get_user_performance_for_graphs: {
         Args: {
           p_end_month?: number

@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { useRoutes, Routes, Route, Navigate } from "react-router-dom";
 import AdminDashboard from "./components/AdminDashboard";
 import SafireDashboard from "./components/SafireDashboard";
+import Microsoft365Workspace from "./components/Microsoft365Workspace";
 import Login from "./components/Login";
 import AdminLogin from "./components/AdminLogin";
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -87,6 +88,16 @@ function AppContent() {
               <AdminProtectedRoute>
                 <AdminDashboard />
               </AdminProtectedRoute>
+            }
+          />
+
+          {/* Microsoft 365 Email Workspace */}
+          <Route
+            path="/email"
+            element={
+              <ProtectedRoute>
+                <Microsoft365Workspace />
+              </ProtectedRoute>
             }
           />
           {/* Fallback route for any unmatched paths */}

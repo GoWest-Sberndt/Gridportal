@@ -1256,6 +1256,7 @@ export default function SafireDashboard() {
   const [featuredVideoUrl, setFeaturedVideoUrl] = useState(null);
   const [featuredVideos, setFeaturedVideos] = useState([]);
   const [currentVideoIndex, setCurrentVideoIndex] = useState(0);
+  const [pitNotificationCount, setPitNotificationCount] = useState(0);
 
   // Use real user data from Supabase
   const currentUserData = {
@@ -1304,6 +1305,18 @@ export default function SafireDashboard() {
   // Selected UMBS rate state
   const [selectedUmbsRate, setSelectedUmbsRate] = useState("5.5");
 
+  // Load PIT notification count
+  const loadPITNotifications = async () => {
+    if (!user?.id) return;
+    try {
+      const count = await supabaseHelpers.getPITNotificationCount(user.id);
+      setPitNotificationCount(count);
+    } catch (error) {
+      console.error("Error loading PIT notifications:", error);
+      setPitNotificationCount(0);
+    }
+  };
+
   // Load data from Supabase
   useEffect(() => {
     const loadDashboardData = async () => {
@@ -1328,6 +1341,9 @@ export default function SafireDashboard() {
 
         setMarketData(defaultMarketData);
         setNewsData(defaultNewsData);
+
+        // Load PIT notifications
+        await loadPITNotifications();
 
         // Load user profile data if user is available
         if (user?.id) {
@@ -1527,6 +1543,23 @@ export default function SafireDashboard() {
     };
 
     loadDashboardData();
+  }, [user?.id]);
+
+  // Set up interval to refresh PIT notifications
+  useEffect(() => {
+    if (!user?.id) return;
+
+    // Load initial notifications
+    loadPITNotifications();
+
+    // Set up interval to refresh every 30 seconds
+    const notificationInterval = setInterval(() => {
+      loadPITNotifications();
+    }, 30000);
+
+    return () => {
+      clearInterval(notificationInterval);
+    };
   }, [user?.id]);
 
   // Fetch market data from multiple sources with timeout and error handling
@@ -2442,15 +2475,31 @@ export default function SafireDashboard() {
                 leftSidebarCollapsed ? "flex justify-center" : ""
               }`}
             >
-              <button
-                onClick={() => setShowPITSystem(true)}
-                className={`${leftSidebarCollapsed ? "w-10 h-10" : "w-full"} p-3 bg-[#0b2a48] rounded-xl border border-[#1a3d63] flex items-center ${leftSidebarCollapsed ? "justify-center" : "gap-2"} text-[#cfe0ff] hover:bg-[#1a4a73] transition-colors`}
-              >
-                <MessageSquare size={16} />
-                {!leftSidebarCollapsed && (
-                  <span className="text-sm font-bold">Submit PIT request</span>
+              <div className="relative">
+                <button
+                  onClick={() => {
+                    setShowPITSystem(true);
+                    // Reset notification count when PIT system is opened
+                    setPitNotificationCount(0);
+                  }}
+                  className={`${leftSidebarCollapsed ? "w-10 h-10" : "w-full"} p-3 bg-yellow-400 hover:bg-yellow-500 rounded-xl border border-yellow-300 flex items-center ${leftSidebarCollapsed ? "justify-center" : "gap-2"} text-[#032F60] transition-colors`}
+                >
+                  <MessageSquare size={16} />
+                  {!leftSidebarCollapsed && (
+                    <span className="text-sm font-bold">
+                      Submit PIT request
+                    </span>
+                  )}
+                </button>
+                {/* Notification Badge */}
+                {pitNotificationCount > 0 && (
+                  <div className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center shadow-lg border-2 border-white">
+                    <span className="text-xs font-bold text-white">
+                      {pitNotificationCount > 9 ? "9+" : pitNotificationCount}
+                    </span>
+                  </div>
                 )}
-              </button>
+              </div>
             </div>
           </div>
         </div>
@@ -2606,7 +2655,15 @@ export default function SafireDashboard() {
       )}
 
       {/* PIT System Modal */}
-      {showPITSystem && <PITSystem onClose={() => setShowPITSystem(false)} />}
+      {showPITSystem && (
+        <PITSystem
+          onClose={() => {
+            setShowPITSystem(false);
+            // Refresh notification count when PIT system is closed
+            loadPITNotifications();
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -6004,36 +6061,11 @@ function DashboardContent({
         {/* Left Side Profile Card */}
         <div className="w-80 flex-shrink-0">
           <div className="bg-white rounded-xl shadow-lg p-6 h-full">
-            {/* Profile Image with Progress Ring */}
+            {/* Profile Image */}
             <div className="text-center mb-6">
               <div className="w-24 h-24 relative mx-auto mb-4">
-                {/* Progress Ring */}
-                <svg
-                  className="w-24 h-24 transform -rotate-90"
-                  viewBox="0 0 100 100"
-                >
-                  <circle
-                    cx="50"
-                    cy="50"
-                    r="45"
-                    stroke="#e5e7eb"
-                    strokeWidth="4"
-                    fill="none"
-                  />
-                  <circle
-                    cx="50"
-                    cy="50"
-                    r="45"
-                    stroke="#032F60"
-                    strokeWidth="4"
-                    fill="none"
-                    strokeDasharray={`${75 * 2.83} ${(100 - 75) * 2.83}`}
-                    strokeLinecap="round"
-                    className="transition-all duration-300"
-                  />
-                </svg>
                 {/* Profile Image */}
-                <div className="absolute inset-2 rounded-full overflow-hidden">
+                <div className="w-full h-full rounded-full overflow-hidden">
                   {userProfile?.avatar || user?.avatar ? (
                     <img
                       src={userProfile?.avatar || user?.avatar}
@@ -6607,94 +6639,57 @@ function DashboardContent({
               <FeaturedVideoPlayer currentVideoIndex={currentVideoIndex || 0} />
             </div>
 
-            {/* Market Card */}
+            {/* Market Card - Iframe Widget */}
             <div className="bg-white rounded-xl shadow-lg p-4 min-w-0">
               <div className="mb-3">
-                <div className="flex items-center justify-between mb-2">
-                  <h3 className="text-[#032F60] font-extrabold text-sm">
-                    Market
-                  </h3>
-                </div>
-                <div className="flex flex-wrap gap-1 bg-gray-100 rounded-lg p-1 mx-2">
-                  {["5", "5.5", "6"].map((rate) => (
-                    <button
-                      key={rate}
-                      onClick={() => setSelectedUmbsRate(rate)}
-                      className={`flex-1 min-w-0 px-1 py-2 text-xs font-bold rounded transition-colors ${
-                        selectedUmbsRate === rate
-                          ? "bg-[#032F60] text-white"
-                          : "text-gray-600 hover:text-gray-800"
-                      }`}
-                    >
-                      {rate}%
-                    </button>
-                  ))}
-                </div>
+                <h3 className="text-[#032F60] font-extrabold text-sm">
+                  Market Data
+                </h3>
+                <p className="text-[#6f7d8f] text-xs">
+                  Average rates and product pricing
+                </p>
               </div>
-              <div className="grid grid-cols-1 gap-2 min-w-0">
-                <div className="bg-[#eef4fb] rounded-lg p-2 min-w-0">
-                  <p className="text-[#6f7d8f] text-xs font-bold mb-1">
-                    UMBS 30 Yr {selectedUmbsRate}%
-                  </p>
-                  <p className="text-[#1d2430] text-lg font-extrabold mb-1">
-                    {selectedUmbsRate === "5.5"
-                      ? marketData.umbs30yr55.value
-                      : selectedUmbsRate === "5"
-                        ? marketData.umbs30yr5.value
-                        : marketData.umbs30yr6.value}
-                  </p>
-                  <span
-                    className={`bg-white rounded-full px-1.5 py-0.5 text-xs font-bold shadow-sm inline-block ${
-                      (
-                        selectedUmbsRate === "5.5"
-                          ? marketData.umbs30yr55.isPositive
-                          : selectedUmbsRate === "5"
-                            ? marketData.umbs30yr5.isPositive
-                            : marketData.umbs30yr6.isPositive
-                      )
-                        ? "text-[#15a46a]"
-                        : "text-[#e45765]"
-                    }`}
-                  >
-                    {(
-                      selectedUmbsRate === "5.5"
-                        ? marketData.umbs30yr55.isPositive
-                        : selectedUmbsRate === "5"
-                          ? marketData.umbs30yr5.isPositive
-                          : marketData.umbs30yr6.isPositive
-                    )
-                      ? "▲"
-                      : "▼"}{" "}
-                    {Math.abs(
-                      parseFloat(
-                        selectedUmbsRate === "5.5"
-                          ? marketData.umbs30yr55.change
-                          : selectedUmbsRate === "5"
-                            ? marketData.umbs30yr5.change
-                            : marketData.umbs30yr6.change,
-                      ),
-                    ).toFixed(3)}
-                  </span>
-                </div>
-                <div className="bg-[#eef4fb] rounded-lg p-2 min-w-0">
-                  <p className="text-[#6f7d8f] text-xs font-bold mb-1">
-                    10 Year Treasury
-                  </p>
-                  <p className="text-[#1d2430] text-lg font-extrabold mb-1">
-                    {marketData.treasury10yr.value}
-                  </p>
-                  <span
-                    className={`bg-white rounded-full px-1.5 py-0.5 text-xs font-bold shadow-sm inline-block ${
-                      marketData.treasury10yr.isPositive
-                        ? "text-[#15a46a]"
-                        : "text-[#e45765]"
-                    }`}
-                  >
-                    {marketData.treasury10yr.isPositive ? "▲" : "▼"}{" "}
-                    {Math.abs(
-                      parseFloat(marketData.treasury10yr.change),
-                    ).toFixed(3)}
-                  </span>
+              <div className="flex justify-center">
+                <div
+                  className="mnd-rates-widget"
+                  style={{
+                    width: "215px",
+                    height: "260px",
+                    fontSize: "12px",
+                    background: "#FFFFFF",
+                    border: "1px solid #FFFFFF",
+                    boxSizing: "border-box",
+                    position: "relative",
+                    overflow: "hidden",
+                  }}
+                >
+                  <iframe
+                    src="//widgets.mortgagenewsdaily.com/widget/f/rates?t=small&sc=true&c=2873bd&u=&cbu=&w=213&h=260"
+                    width="215"
+                    height="260"
+                    frameBorder="0"
+                    scrolling="no"
+                    style={{
+                      width: "100%",
+                      height: "100%",
+                      border: 0,
+                      display: "block",
+                    }}
+                    title="Mortgage Rates Widget"
+                  />
+                  {/* 3px white overlay at the bottom (click-through) */}
+                  <div
+                    aria-hidden="true"
+                    style={{
+                      position: "absolute",
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      height: "3px",
+                      background: "#FFFFFF",
+                      pointerEvents: "none",
+                    }}
+                  />
                 </div>
               </div>
             </div>

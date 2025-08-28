@@ -46,6 +46,7 @@ interface PITSystemProps {
 
 interface Ticket {
   id: string;
+  ticket_number: string;
   title: string;
   description: string;
   category: string;
@@ -99,10 +100,11 @@ export default function PITSystem({ onClose }: PITSystemProps) {
 
   // State management
   const [activeView, setActiveView] = useState<
-    "create" | "list" | "assigned" | "view"
+    "create" | "list" | "assigned" | "admin" | "view"
   >("list");
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [assignedTickets, setAssignedTickets] = useState<Ticket[]>([]);
+  const [allTickets, setAllTickets] = useState<Ticket[]>([]);
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
   const [ticketComments, setTicketComments] = useState<TicketComment[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -110,6 +112,9 @@ export default function PITSystem({ onClose }: PITSystemProps) {
   const [submitting, setSubmitting] = useState(false);
   const [ticketStats, setTicketStats] = useState<any>(null);
   const [assignedTicketStats, setAssignedTicketStats] = useState<any>(null);
+  const [allTicketStats, setAllTicketStats] = useState<any>(null);
+  const [allUsers, setAllUsers] = useState<any[]>([]);
+  const [assigningTicket, setAssigningTicket] = useState<string | null>(null);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -122,14 +127,20 @@ export default function PITSystem({ onClose }: PITSystemProps) {
   });
   const [attachments, setAttachments] = useState<File[]>([]);
   const [newComment, setNewComment] = useState("");
+  const [replyAsSafire, setReplyAsSafire] = useState(false);
 
-  // Filters
+  // Filters and Sorting
   const [filters, setFilters] = useState({
-    status: "all",
+    status: "active", // Changed default to exclude resolved tickets
     category: "all",
     priority: "all",
     search: "",
   });
+  const [sortBy, setSortBy] = useState("oldest"); // Default sort by oldest first
+
+  // Check if user is admin
+  const isAdmin =
+    user?.internalRole === "admin" || user?.internalRole === "manager";
 
   // Load initial data
   useEffect(() => {
@@ -138,7 +149,12 @@ export default function PITSystem({ onClose }: PITSystemProps) {
     loadAssignedTickets();
     loadTicketStats();
     loadAssignedTicketStats();
-  }, []);
+    if (isAdmin) {
+      loadAllTickets();
+      loadAllTicketStats();
+      loadAllUsers();
+    }
+  }, [isAdmin]);
 
   const loadCategories = async () => {
     try {
@@ -295,6 +311,60 @@ export default function PITSystem({ onClose }: PITSystemProps) {
     }
   };
 
+  const loadAllTickets = async () => {
+    if (!user || !isAdmin) return;
+
+    setLoading(true);
+    try {
+      const allTicketsData = await supabaseHelpers.getAllTickets();
+      setAllTickets(allTicketsData || []);
+    } catch (error) {
+      console.error("Error loading all tickets:", error);
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error occurred";
+      toast({
+        title: "Failed to load all tickets",
+        description: `Error: ${errorMessage}. Please try refreshing the page or contact support if the issue persists.`,
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadAllTicketStats = async () => {
+    if (!user || !isAdmin) return;
+
+    try {
+      const stats = await supabaseHelpers.getTicketStats();
+      setAllTicketStats(stats);
+    } catch (error) {
+      console.error("Error loading all ticket stats:", error);
+      // Set default stats as fallback
+      setAllTicketStats({
+        total: 0,
+        open: 0,
+        in_progress: 0,
+        resolved: 0,
+        closed: 0,
+        high_priority: 0,
+        by_category: {},
+      });
+    }
+  };
+
+  const loadAllUsers = async () => {
+    if (!user || !isAdmin) return;
+
+    try {
+      const users = await supabaseHelpers.getUsers();
+      setAllUsers(users || []);
+    } catch (error) {
+      console.error("Error loading users:", error);
+      setAllUsers([]);
+    }
+  };
+
   const loadTicketComments = async (ticketId: string) => {
     try {
       const comments = await supabaseHelpers.getTicketComments(ticketId);
@@ -430,6 +500,10 @@ export default function PITSystem({ onClose }: PITSystemProps) {
       loadAssignedTickets();
       loadTicketStats();
       loadAssignedTicketStats();
+      if (isAdmin) {
+        loadAllTickets();
+        loadAllTicketStats();
+      }
       setActiveView("list");
     } catch (error) {
       console.error("Error creating ticket:", error);
@@ -447,15 +521,87 @@ export default function PITSystem({ onClose }: PITSystemProps) {
     if (!selectedTicket || !user || !newComment.trim()) return;
 
     try {
-      await supabaseHelpers.addTicketComment({
-        ticketId: selectedTicket.id,
-        userId: user.id,
-        comment: newComment,
-        isInternal: false,
-      });
+      // Check if the current user is the assigned user and update status to in_progress
+      const isAssignedUser = selectedTicket.assigned_user?.id === user.id;
+
+      if (replyAsSafire && isAdmin) {
+        // Create a special comment as Safire Home Lending with system user
+        const { data: systemUser, error: systemUserError } = await supabase
+          .from("users")
+          .select("*")
+          .eq("email", "system@safirehome.com")
+          .single();
+
+        let systemUserId = "safire-system";
+        if (systemUserError || !systemUser) {
+          // Create system user if it doesn't exist
+          try {
+            const { data: newSystemUser, error: createError } = await supabase
+              .from("users")
+              .insert({
+                id: "safire-system",
+                name: "Safire Home Lending",
+                email: "system@safirehome.com",
+                role: "System",
+                internal_role: "admin",
+                status: "active",
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+              })
+              .select()
+              .single();
+
+            if (!createError && newSystemUser) {
+              systemUserId = newSystemUser.id;
+            }
+          } catch (createSystemUserError) {
+            console.warn("Could not create system user, using fallback ID");
+          }
+        } else {
+          systemUserId = systemUser.id;
+        }
+
+        await supabaseHelpers.addTicketComment({
+          ticketId: selectedTicket.id,
+          userId: systemUserId,
+          comment: newComment,
+          isInternal: false,
+        });
+      } else {
+        await supabaseHelpers.addTicketComment({
+          ticketId: selectedTicket.id,
+          userId: user.id,
+          comment: newComment,
+          isInternal: false,
+        });
+      }
+
+      // If the assigned user is replying, automatically set status to in_progress
+      if (isAssignedUser && selectedTicket.status === "open") {
+        await supabaseHelpers.updateTicket(selectedTicket.id, {
+          status: "in_progress",
+        });
+
+        // Update local state
+        setSelectedTicket({
+          ...selectedTicket,
+          status: "in_progress",
+        });
+      }
 
       setNewComment("");
+      setReplyAsSafire(false);
       loadTicketComments(selectedTicket.id);
+
+      // Refresh tickets and stats
+      loadTickets();
+      loadAssignedTickets();
+      loadTicketStats();
+      loadAssignedTicketStats();
+      if (isAdmin) {
+        loadAllTickets();
+        loadAllTicketStats();
+      }
 
       toast({
         title: "Success",
@@ -466,6 +612,98 @@ export default function PITSystem({ onClose }: PITSystemProps) {
       toast({
         title: "Error",
         description: "Failed to add comment",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleTicketAction = async (
+    action: "satisfied" | "not_satisfied" | "clarification" | "in_progress",
+  ) => {
+    if (!selectedTicket || !user) return;
+
+    try {
+      let newStatus = selectedTicket.status;
+      let comment = "";
+      let priority = selectedTicket.priority;
+      const isAssignedUser = selectedTicket.assigned_user?.id === user.id;
+
+      switch (action) {
+        case "satisfied":
+          newStatus = "resolved";
+          comment = "User marked as satisfied - ticket resolved";
+          break;
+        case "not_satisfied":
+          newStatus = "in_progress";
+          comment =
+            "User is not satisfied - ticket escalated for further review";
+          // Escalate priority if not already urgent
+          if (priority === "low") priority = "medium";
+          else if (priority === "medium") priority = "high";
+          else if (priority === "high") priority = "urgent";
+          break;
+        case "clarification":
+          newStatus = "in_progress";
+          comment =
+            "User requested clarification - awaiting additional information";
+          break;
+        case "in_progress":
+          newStatus = "in_progress";
+          comment = isAssignedUser
+            ? "Assigned user marked ticket as in progress"
+            : "Ticket status updated to in progress";
+          break;
+      }
+
+      // Update ticket status and priority
+      await supabaseHelpers.updateTicket(selectedTicket.id, {
+        status: newStatus,
+        priority: priority,
+        resolved_by: action === "satisfied" ? user.id : undefined,
+      });
+
+      // Add system comment
+      await supabaseHelpers.addTicketComment({
+        ticketId: selectedTicket.id,
+        userId: user.id,
+        comment: comment,
+        isInternal: false,
+      });
+
+      // Update local state
+      setSelectedTicket({
+        ...selectedTicket,
+        status: newStatus,
+        priority: priority,
+      });
+
+      // Reload comments and tickets
+      loadTicketComments(selectedTicket.id);
+      loadTickets();
+      loadAssignedTickets();
+      loadTicketStats();
+      loadAssignedTicketStats();
+      if (isAdmin) {
+        loadAllTickets();
+        loadAllTicketStats();
+      }
+
+      const actionMessages = {
+        satisfied: "Ticket marked as resolved",
+        not_satisfied: "Ticket escalated for further review",
+        clarification: "Clarification requested",
+        in_progress: "Ticket marked as in progress",
+      };
+
+      toast({
+        title: "Success",
+        description: actionMessages[action],
+      });
+    } catch (error) {
+      console.error("Error updating ticket:", error);
+      toast({
+        title: "Error",
+        description: "Failed to update ticket",
         variant: "destructive",
       });
     }
@@ -522,61 +760,249 @@ export default function PITSystem({ onClose }: PITSystemProps) {
     }
   };
 
-  const filteredTickets = tickets.filter((ticket) => {
-    if (
-      filters.status &&
-      filters.status !== "all" &&
-      ticket.status !== filters.status
-    )
-      return false;
-    if (
-      filters.category &&
-      filters.category !== "all" &&
-      ticket.category !== filters.category
-    )
-      return false;
-    if (
-      filters.priority &&
-      filters.priority !== "all" &&
-      ticket.priority !== filters.priority
-    )
-      return false;
-    if (
-      filters.search &&
-      !ticket.title.toLowerCase().includes(filters.search.toLowerCase()) &&
-      !ticket.description.toLowerCase().includes(filters.search.toLowerCase())
-    )
-      return false;
-    return true;
-  });
+  const sortTickets = (ticketsToSort: Ticket[]) => {
+    const sorted = [...ticketsToSort];
+    switch (sortBy) {
+      case "newest":
+        return sorted.sort(
+          (a, b) =>
+            new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+        );
+      case "oldest":
+        return sorted.sort(
+          (a, b) =>
+            new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
+        );
+      case "priority":
+        const priorityOrder = { urgent: 4, high: 3, medium: 2, low: 1 };
+        return sorted.sort(
+          (a, b) => priorityOrder[b.priority] - priorityOrder[a.priority],
+        );
+      case "status":
+        const statusOrder = { open: 4, in_progress: 3, resolved: 2, closed: 1 };
+        return sorted.sort(
+          (a, b) => statusOrder[b.status] - statusOrder[a.status],
+        );
+      case "title":
+        return sorted.sort((a, b) => a.title.localeCompare(b.title));
+      default:
+        return sorted;
+    }
+  };
 
-  const filteredAssignedTickets = assignedTickets.filter((ticket) => {
-    if (
-      filters.status &&
-      filters.status !== "all" &&
-      ticket.status !== filters.status
-    )
-      return false;
-    if (
-      filters.category &&
-      filters.category !== "all" &&
-      ticket.category !== filters.category
-    )
-      return false;
-    if (
-      filters.priority &&
-      filters.priority !== "all" &&
-      ticket.priority !== filters.priority
-    )
-      return false;
-    if (
-      filters.search &&
-      !ticket.title.toLowerCase().includes(filters.search.toLowerCase()) &&
-      !ticket.description.toLowerCase().includes(filters.search.toLowerCase())
-    )
-      return false;
-    return true;
-  });
+  const filteredTickets = sortTickets(
+    tickets.filter((ticket) => {
+      if (filters.status && filters.status !== "all") {
+        if (filters.status === "active") {
+          // "active" means not resolved or closed
+          if (ticket.status === "resolved" || ticket.status === "closed")
+            return false;
+        } else if (ticket.status !== filters.status) {
+          return false;
+        }
+      }
+      if (
+        filters.category &&
+        filters.category !== "all" &&
+        ticket.category !== filters.category
+      )
+        return false;
+      if (
+        filters.priority &&
+        filters.priority !== "all" &&
+        ticket.priority !== filters.priority
+      )
+        return false;
+      if (
+        filters.search &&
+        !ticket.title.toLowerCase().includes(filters.search.toLowerCase()) &&
+        !ticket.description.toLowerCase().includes(filters.search.toLowerCase())
+      )
+        return false;
+      return true;
+    }),
+  );
+
+  const filteredAssignedTickets = sortTickets(
+    assignedTickets.filter((ticket) => {
+      if (filters.status && filters.status !== "all") {
+        if (filters.status === "active") {
+          // "active" means not resolved or closed
+          if (ticket.status === "resolved" || ticket.status === "closed")
+            return false;
+        } else if (ticket.status !== filters.status) {
+          return false;
+        }
+      }
+      if (
+        filters.category &&
+        filters.category !== "all" &&
+        ticket.category !== filters.category
+      )
+        return false;
+      if (
+        filters.priority &&
+        filters.priority !== "all" &&
+        ticket.priority !== filters.priority
+      )
+        return false;
+      if (
+        filters.search &&
+        !ticket.title.toLowerCase().includes(filters.search.toLowerCase()) &&
+        !ticket.description.toLowerCase().includes(filters.search.toLowerCase())
+      )
+        return false;
+      return true;
+    }),
+  );
+
+  const filteredAllTickets = sortTickets(
+    allTickets.filter((ticket) => {
+      if (filters.status && filters.status !== "all") {
+        if (filters.status === "active") {
+          // "active" means not resolved or closed
+          if (ticket.status === "resolved" || ticket.status === "closed")
+            return false;
+        } else if (ticket.status !== filters.status) {
+          return false;
+        }
+      }
+      if (
+        filters.category &&
+        filters.category !== "all" &&
+        ticket.category !== filters.category
+      )
+        return false;
+      if (
+        filters.priority &&
+        filters.priority !== "all" &&
+        ticket.priority !== filters.priority
+      )
+        return false;
+      if (
+        filters.search &&
+        !ticket.title.toLowerCase().includes(filters.search.toLowerCase()) &&
+        !ticket.description.toLowerCase().includes(filters.search.toLowerCase())
+      )
+        return false;
+      return true;
+    }),
+  );
+
+  const handleForceClose = async () => {
+    if (!selectedTicket || !user || !isAdmin) return;
+
+    try {
+      // Force close the ticket
+      await supabaseHelpers.updateTicket(selectedTicket.id, {
+        status: "closed",
+        resolved_by: user.id,
+      });
+
+      // Add system comment
+      await supabaseHelpers.addTicketComment({
+        ticketId: selectedTicket.id,
+        userId: user.id,
+        comment: "Ticket force closed by administrator",
+        isInternal: false,
+      });
+
+      // Update local state
+      setSelectedTicket({
+        ...selectedTicket,
+        status: "closed",
+      });
+
+      // Reload comments and tickets
+      loadTicketComments(selectedTicket.id);
+      loadTickets();
+      loadAssignedTickets();
+      loadTicketStats();
+      loadAssignedTicketStats();
+      if (isAdmin) {
+        loadAllTickets();
+        loadAllTicketStats();
+      }
+
+      toast({
+        title: "Success",
+        description: "Ticket force closed successfully",
+      });
+    } catch (error) {
+      console.error("Error force closing ticket:", error);
+      toast({
+        title: "Error",
+        description: "Failed to force close ticket",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleAssignTicket = async (
+    ticketId: string,
+    assignedUserId: string,
+  ) => {
+    if (!user || !isAdmin) return;
+
+    setAssigningTicket(ticketId);
+    try {
+      const assignedUser = assignedUserId
+        ? allUsers.find((u) => u.id === assignedUserId)
+        : null;
+
+      // Update ticket assignment
+      await supabaseHelpers.updateTicket(ticketId, {
+        assigned_to: assignedUserId || null,
+        status: assignedUserId ? "in_progress" : "open",
+      });
+
+      // Add system comment
+      await supabaseHelpers.addTicketComment({
+        ticketId: ticketId,
+        userId: user.id,
+        comment: assignedUserId
+          ? `Ticket assigned to ${assignedUser?.name || "user"} by administrator`
+          : `Ticket unassigned by administrator`,
+        isInternal: false,
+      });
+
+      // Reload tickets and stats
+      loadTickets();
+      loadAssignedTickets();
+      loadTicketStats();
+      loadAssignedTicketStats();
+      if (isAdmin) {
+        loadAllTickets();
+        loadAllTicketStats();
+      }
+
+      // Update selected ticket if it's the one being assigned
+      if (selectedTicket && selectedTicket.id === ticketId) {
+        setSelectedTicket({
+          ...selectedTicket,
+          status: assignedUserId ? "in_progress" : "open",
+          assigned_user: assignedUser || undefined,
+        });
+        loadTicketComments(ticketId);
+      }
+
+      toast({
+        title: "Success",
+        description: assignedUserId
+          ? `Ticket assigned to ${assignedUser?.name || "user"} successfully`
+          : "Ticket unassigned successfully",
+      });
+    } catch (error) {
+      console.error("Error assigning ticket:", error);
+      toast({
+        title: "Error",
+        description: "Failed to assign ticket",
+        variant: "destructive",
+      });
+    } finally {
+      setAssigningTicket(null);
+    }
+  };
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -619,6 +1045,18 @@ export default function PITSystem({ onClose }: PITSystemProps) {
               >
                 Assigned to Me
               </button>
+              {isAdmin && (
+                <button
+                  onClick={() => setActiveView("admin")}
+                  className={`px-3 py-1 text-sm font-medium rounded transition-colors ${
+                    activeView === "admin"
+                      ? "bg-white text-[#032F60] shadow-sm"
+                      : "text-gray-600 hover:text-gray-800"
+                  }`}
+                >
+                  Admin View
+                </button>
+              )}
               <button
                 onClick={() => setActiveView("create")}
                 className={`px-3 py-1 text-sm font-medium rounded transition-colors ${
@@ -877,7 +1315,7 @@ export default function PITSystem({ onClose }: PITSystemProps) {
                         <Button
                           type="submit"
                           disabled={submitting}
-                          className="bg-[#032F60] hover:bg-[#1a4a73]"
+                          className="bg-yellow-400 hover:bg-yellow-500 text-[#032F60] font-bold"
                         >
                           {submitting ? "Creating..." : "Create Ticket"}
                         </Button>
@@ -954,7 +1392,7 @@ export default function PITSystem({ onClose }: PITSystemProps) {
                         className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
                       />
                       <Input
-                        placeholder="Search tickets..."
+                        placeholder="Search tickets by title, description, or ticket number..."
                         value={filters.search}
                         onChange={(e) =>
                           setFilters((prev) => ({
@@ -973,10 +1411,11 @@ export default function PITSystem({ onClose }: PITSystemProps) {
                     }
                   >
                     <SelectTrigger className="w-[140px]">
-                      <SelectValue placeholder="All Status" />
+                      <SelectValue placeholder="Status" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All Status</SelectItem>
+                      <SelectItem value="active">Active Only</SelectItem>
                       <SelectItem value="open">Open</SelectItem>
                       <SelectItem value="in_progress">In Progress</SelectItem>
                       <SelectItem value="resolved">Resolved</SelectItem>
@@ -1021,122 +1460,192 @@ export default function PITSystem({ onClose }: PITSystemProps) {
                       <SelectItem value="low">Low</SelectItem>
                     </SelectContent>
                   </Select>
+                  <Select
+                    value={sortBy}
+                    onValueChange={(value) => setSortBy(value)}
+                  >
+                    <SelectTrigger className="w-[140px]">
+                      <SelectValue placeholder="Sort by" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="oldest">Oldest First</SelectItem>
+                      <SelectItem value="newest">Newest First</SelectItem>
+                      <SelectItem value="priority">Priority</SelectItem>
+                      <SelectItem value="status">Status</SelectItem>
+                      <SelectItem value="title">Title A-Z</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
 
               {/* Tickets List */}
-              <div className="flex-1 overflow-auto p-6">
-                {loading ? (
-                  <div className="flex items-center justify-center py-12">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#032F60]"></div>
-                  </div>
-                ) : filteredTickets.length === 0 ? (
-                  <div className="text-center py-12">
-                    <MessageSquare
-                      size={48}
-                      className="mx-auto mb-4 text-gray-400"
-                    />
-                    <h3 className="text-lg font-semibold text-gray-600 mb-2">
-                      {tickets.length === 0
-                        ? "No tickets yet"
-                        : "No tickets match your filters"}
-                    </h3>
-                    <p className="text-gray-500 mb-4">
-                      {tickets.length === 0
-                        ? "Create your first support ticket to get started"
-                        : "Try adjusting your search or filter criteria"}
-                    </p>
-                    {tickets.length === 0 && (
-                      <Button
-                        onClick={() => setActiveView("create")}
-                        className="bg-[#032F60] hover:bg-[#1a4a73]"
-                      >
-                        <Plus size={16} className="mr-2" />
-                        Create First Ticket
-                      </Button>
-                    )}
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {filteredTickets.map((ticket) => (
-                      <Card
-                        key={ticket.id}
-                        className="hover:shadow-md transition-shadow cursor-pointer"
-                        onClick={() => viewTicket(ticket)}
-                      >
-                        <CardContent className="p-4">
-                          <div className="flex items-start justify-between">
-                            <div className="flex-1">
-                              <div className="flex items-center gap-3 mb-2">
-                                <h3 className="font-semibold text-gray-800 line-clamp-1">
-                                  {ticket.title}
-                                </h3>
-                                <Badge
-                                  className={`text-xs ${getPriorityColor(ticket.priority)}`}
-                                >
-                                  <div className="flex items-center gap-1">
-                                    {getPriorityIcon(ticket.priority)}
-                                    {ticket.priority.toUpperCase()}
+              <ScrollArea className="flex-1">
+                <div className="p-6">
+                  {loading ? (
+                    <div className="flex items-center justify-center py-12">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#032F60]"></div>
+                    </div>
+                  ) : filteredTickets.length === 0 ? (
+                    <div className="text-center py-12">
+                      <MessageSquare
+                        size={48}
+                        className="mx-auto mb-4 text-gray-400"
+                      />
+                      <h3 className="text-lg font-semibold text-gray-600 mb-2">
+                        {tickets.length === 0
+                          ? "No tickets yet"
+                          : "No tickets match your filters"}
+                      </h3>
+                      <p className="text-gray-500 mb-4">
+                        {tickets.length === 0
+                          ? "Create your first support ticket to get started"
+                          : "Try adjusting your search or filter criteria"}
+                      </p>
+                      {tickets.length === 0 && (
+                        <Button
+                          onClick={() => setActiveView("create")}
+                          className="bg-[#032F60] hover:bg-[#1a4a73]"
+                        >
+                          <Plus size={16} className="mr-2" />
+                          Create First Ticket
+                        </Button>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {filteredTickets.map((ticket) => (
+                        <Card
+                          key={ticket.id}
+                          className="hover:shadow-md transition-shadow cursor-pointer"
+                          onClick={() => viewTicket(ticket)}
+                        >
+                          <CardContent className="p-4">
+                            <div className="flex items-start justify-between">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-3 mb-2">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-xs font-mono text-blue-600 bg-blue-50 px-2 py-1 rounded">
+                                      {ticket.ticket_number}
+                                    </span>
+                                    <h3 className="font-semibold text-gray-800 line-clamp-1">
+                                      {ticket.title}
+                                    </h3>
                                   </div>
-                                </Badge>
-                                <Badge
-                                  className={`text-xs ${getStatusColor(ticket.status)}`}
-                                >
-                                  {ticket.status
-                                    .replace("_", " ")
-                                    .toUpperCase()}
-                                </Badge>
-                              </div>
-                              <p className="text-sm text-gray-600 line-clamp-2 mb-3">
-                                {ticket.description}
-                              </p>
-                              <div className="flex items-center gap-4 text-xs text-gray-500">
-                                <div className="flex items-center gap-1">
-                                  <Tag size={12} />
-                                  {categories.find(
-                                    (c) => c.id === ticket.category,
-                                  )?.name || ticket.category}
-                                </div>
-                                {ticket.loan_number && (
-                                  <div className="flex items-center gap-1">
-                                    <FileText size={12} />
-                                    {ticket.loan_number}
-                                  </div>
-                                )}
-                                {ticket.client_name && (
-                                  <div className="flex items-center gap-1">
-                                    <User size={12} />
-                                    {ticket.client_name}
-                                  </div>
-                                )}
-                                <div className="flex items-center gap-1">
-                                  <Calendar size={12} />
-                                  {new Date(
-                                    ticket.created_at,
-                                  ).toLocaleDateString()}
-                                </div>
-                                {ticket.attachments &&
-                                  ticket.attachments.length > 0 && (
+                                  <Badge
+                                    className={`text-xs ${getPriorityColor(ticket.priority)}`}
+                                  >
                                     <div className="flex items-center gap-1">
-                                      <Paperclip size={12} />
-                                      {ticket.attachments.length} file
-                                      {ticket.attachments.length !== 1
-                                        ? "s"
-                                        : ""}
+                                      {getPriorityIcon(ticket.priority)}
+                                      {ticket.priority.toUpperCase()}
+                                    </div>
+                                  </Badge>
+                                  <Badge
+                                    className={`text-xs ${getStatusColor(ticket.status)}`}
+                                  >
+                                    {ticket.status
+                                      .replace("_", " ")
+                                      .toUpperCase()}
+                                  </Badge>
+                                </div>
+                                <p className="text-sm text-gray-600 line-clamp-2 mb-3">
+                                  {ticket.description}
+                                </p>
+                                <div className="flex items-center gap-4 text-xs text-gray-500">
+                                  <div className="flex items-center gap-1">
+                                    <Tag size={12} />
+                                    {categories.find(
+                                      (c) => c.id === ticket.category,
+                                    )?.name || ticket.category}
+                                  </div>
+                                  {ticket.user && (
+                                    <div className="flex items-center gap-1">
+                                      <User size={12} />
+                                      Created by: {ticket.user.name}
                                     </div>
                                   )}
+                                  {ticket.loan_number && (
+                                    <div className="flex items-center gap-1">
+                                      <FileText size={12} />
+                                      {ticket.loan_number}
+                                    </div>
+                                  )}
+                                  {ticket.client_name && (
+                                    <div className="flex items-center gap-1">
+                                      <User size={12} />
+                                      {ticket.client_name}
+                                    </div>
+                                  )}
+                                  <div className="flex items-center gap-1">
+                                    <Calendar size={12} />
+                                    {new Date(
+                                      ticket.created_at,
+                                    ).toLocaleDateString()}
+                                  </div>
+                                  {ticket.attachments &&
+                                    ticket.attachments.length > 0 && (
+                                      <div className="flex items-center gap-1">
+                                        <Paperclip size={12} />
+                                        {ticket.attachments.length} file
+                                        {ticket.attachments.length !== 1
+                                          ? "s"
+                                          : ""}
+                                      </div>
+                                    )}
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                {/* Assignment Dropdown */}
+                                <div
+                                  className="flex items-center gap-2"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <Select
+                                    value={
+                                      ticket.assigned_user?.id || "unassigned"
+                                    }
+                                    onValueChange={(value) =>
+                                      handleAssignTicket(
+                                        ticket.id,
+                                        value === "unassigned" ? "" : value,
+                                      )
+                                    }
+                                    disabled={assigningTicket === ticket.id}
+                                  >
+                                    <SelectTrigger className="w-[140px] h-8 text-xs">
+                                      <SelectValue placeholder="Assign to..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="unassigned">
+                                        <span className="text-gray-500">
+                                          Unassigned
+                                        </span>
+                                      </SelectItem>
+                                      {allUsers.map((user) => (
+                                        <SelectItem
+                                          key={user.id}
+                                          value={user.id}
+                                        >
+                                          {user.name}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                  {assigningTicket === ticket.id && (
+                                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-[#032F60]"></div>
+                                  )}
+                                </div>
+                                <Button variant="ghost" size="sm">
+                                  <Eye size={16} />
+                                </Button>
                               </div>
                             </div>
-                            <Button variant="ghost" size="sm">
-                              <Eye size={16} />
-                            </Button>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                )}
-              </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </ScrollArea>
             </div>
           )}
 
@@ -1228,6 +1737,7 @@ export default function PITSystem({ onClose }: PITSystemProps) {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All Status</SelectItem>
+                      <SelectItem value="active">Active Only</SelectItem>
                       <SelectItem value="open">Open</SelectItem>
                       <SelectItem value="in_progress">In Progress</SelectItem>
                       <SelectItem value="resolved">Resolved</SelectItem>
@@ -1272,119 +1782,502 @@ export default function PITSystem({ onClose }: PITSystemProps) {
                       <SelectItem value="low">Low</SelectItem>
                     </SelectContent>
                   </Select>
+                  <Select
+                    value={sortBy}
+                    onValueChange={(value) => setSortBy(value)}
+                  >
+                    <SelectTrigger className="w-[140px]">
+                      <SelectValue placeholder="Sort by" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="oldest">Oldest First</SelectItem>
+                      <SelectItem value="newest">Newest First</SelectItem>
+                      <SelectItem value="priority">Priority</SelectItem>
+                      <SelectItem value="status">Status</SelectItem>
+                      <SelectItem value="title">Title A-Z</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
 
               {/* Assigned Tickets List */}
-              <div className="flex-1 overflow-auto p-6">
-                {loading ? (
-                  <div className="flex items-center justify-center py-12">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#032F60]"></div>
-                  </div>
-                ) : filteredAssignedTickets.length === 0 ? (
-                  <div className="text-center py-12">
-                    <MessageSquare
-                      size={48}
-                      className="mx-auto mb-4 text-gray-400"
-                    />
-                    <h3 className="text-lg font-semibold text-gray-600 mb-2">
-                      {assignedTickets.length === 0
-                        ? "No tickets assigned to you"
-                        : "No assigned tickets match your filters"}
-                    </h3>
-                    <p className="text-gray-500 mb-4">
-                      {assignedTickets.length === 0
-                        ? "You don't have any tickets assigned to you at the moment"
-                        : "Try adjusting your search or filter criteria"}
-                    </p>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {filteredAssignedTickets.map((ticket) => (
-                      <Card
-                        key={ticket.id}
-                        className="hover:shadow-md transition-shadow cursor-pointer"
-                        onClick={() => viewTicket(ticket)}
-                      >
-                        <CardContent className="p-4">
-                          <div className="flex items-start justify-between">
-                            <div className="flex-1">
-                              <div className="flex items-center gap-3 mb-2">
-                                <h3 className="font-semibold text-gray-800 line-clamp-1">
-                                  {ticket.title}
-                                </h3>
-                                <Badge
-                                  className={`text-xs ${getPriorityColor(ticket.priority)}`}
-                                >
-                                  <div className="flex items-center gap-1">
-                                    {getPriorityIcon(ticket.priority)}
-                                    {ticket.priority.toUpperCase()}
+              <ScrollArea className="flex-1">
+                <div className="p-6">
+                  {loading ? (
+                    <div className="flex items-center justify-center py-12">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#032F60]"></div>
+                    </div>
+                  ) : filteredAssignedTickets.length === 0 ? (
+                    <div className="text-center py-12">
+                      <MessageSquare
+                        size={48}
+                        className="mx-auto mb-4 text-gray-400"
+                      />
+                      <h3 className="text-lg font-semibold text-gray-600 mb-2">
+                        {assignedTickets.length === 0
+                          ? "No tickets assigned to you"
+                          : "No assigned tickets match your filters"}
+                      </h3>
+                      <p className="text-gray-500 mb-4">
+                        {assignedTickets.length === 0
+                          ? "You don't have any tickets assigned to you at the moment"
+                          : "Try adjusting your search or filter criteria"}
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {filteredAssignedTickets.map((ticket) => (
+                        <Card
+                          key={ticket.id}
+                          className="hover:shadow-md transition-shadow cursor-pointer"
+                          onClick={() => viewTicket(ticket)}
+                        >
+                          <CardContent className="p-4">
+                            <div className="flex items-start justify-between">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-3 mb-2">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-xs font-mono text-blue-600 bg-blue-50 px-2 py-1 rounded">
+                                      {ticket.ticket_number}
+                                    </span>
+                                    <h3 className="font-semibold text-gray-800 line-clamp-1">
+                                      {ticket.title}
+                                    </h3>
                                   </div>
-                                </Badge>
-                                <Badge
-                                  className={`text-xs ${getStatusColor(ticket.status)}`}
-                                >
-                                  {ticket.status
-                                    .replace("_", " ")
-                                    .toUpperCase()}
-                                </Badge>
-                              </div>
-                              <p className="text-sm text-gray-600 line-clamp-2 mb-3">
-                                {ticket.description}
-                              </p>
-                              <div className="flex items-center gap-4 text-xs text-gray-500">
-                                <div className="flex items-center gap-1">
-                                  <Tag size={12} />
-                                  {categories.find(
-                                    (c) => c.id === ticket.category,
-                                  )?.name || ticket.category}
-                                </div>
-                                {ticket.user && (
-                                  <div className="flex items-center gap-1">
-                                    <User size={12} />
-                                    Submitted by: {ticket.user.name}
-                                  </div>
-                                )}
-                                {ticket.loan_number && (
-                                  <div className="flex items-center gap-1">
-                                    <FileText size={12} />
-                                    {ticket.loan_number}
-                                  </div>
-                                )}
-                                {ticket.client_name && (
-                                  <div className="flex items-center gap-1">
-                                    <User size={12} />
-                                    {ticket.client_name}
-                                  </div>
-                                )}
-                                <div className="flex items-center gap-1">
-                                  <Calendar size={12} />
-                                  {new Date(
-                                    ticket.created_at,
-                                  ).toLocaleDateString()}
-                                </div>
-                                {ticket.attachments &&
-                                  ticket.attachments.length > 0 && (
+                                  <Badge
+                                    className={`text-xs ${getPriorityColor(ticket.priority)}`}
+                                  >
                                     <div className="flex items-center gap-1">
-                                      <Paperclip size={12} />
-                                      {ticket.attachments.length} file
-                                      {ticket.attachments.length !== 1
-                                        ? "s"
-                                        : ""}
+                                      {getPriorityIcon(ticket.priority)}
+                                      {ticket.priority.toUpperCase()}
+                                    </div>
+                                  </Badge>
+                                  <Badge
+                                    className={`text-xs ${getStatusColor(ticket.status)}`}
+                                  >
+                                    {ticket.status
+                                      .replace("_", " ")
+                                      .toUpperCase()}
+                                  </Badge>
+                                </div>
+                                <p className="text-sm text-gray-600 line-clamp-2 mb-3">
+                                  {ticket.description}
+                                </p>
+                                <div className="flex items-center gap-4 text-xs text-gray-500">
+                                  <div className="flex items-center gap-1">
+                                    <Tag size={12} />
+                                    {categories.find(
+                                      (c) => c.id === ticket.category,
+                                    )?.name || ticket.category}
+                                  </div>
+                                  {ticket.user && (
+                                    <div className="flex items-center gap-1">
+                                      <User size={12} />
+                                      Created by: {ticket.user.name}
                                     </div>
                                   )}
+                                  {ticket.loan_number && (
+                                    <div className="flex items-center gap-1">
+                                      <FileText size={12} />
+                                      {ticket.loan_number}
+                                    </div>
+                                  )}
+                                  {ticket.client_name && (
+                                    <div className="flex items-center gap-1">
+                                      <User size={12} />
+                                      {ticket.client_name}
+                                    </div>
+                                  )}
+                                  <div className="flex items-center gap-1">
+                                    <Calendar size={12} />
+                                    {new Date(
+                                      ticket.created_at,
+                                    ).toLocaleDateString()}
+                                  </div>
+                                  {ticket.attachments &&
+                                    ticket.attachments.length > 0 && (
+                                      <div className="flex items-center gap-1">
+                                        <Paperclip size={12} />
+                                        {ticket.attachments.length} file
+                                        {ticket.attachments.length !== 1
+                                          ? "s"
+                                          : ""}
+                                      </div>
+                                    )}
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                {/* Assignment Dropdown */}
+                                <div
+                                  className="flex items-center gap-2"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <Select
+                                    value={
+                                      ticket.assigned_user?.id || "unassigned"
+                                    }
+                                    onValueChange={(value) =>
+                                      handleAssignTicket(
+                                        ticket.id,
+                                        value === "unassigned" ? "" : value,
+                                      )
+                                    }
+                                    disabled={assigningTicket === ticket.id}
+                                  >
+                                    <SelectTrigger className="w-[140px] h-8 text-xs">
+                                      <SelectValue placeholder="Assign to..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="unassigned">
+                                        <span className="text-gray-500">
+                                          Unassigned
+                                        </span>
+                                      </SelectItem>
+                                      {allUsers.map((user) => (
+                                        <SelectItem
+                                          key={user.id}
+                                          value={user.id}
+                                        >
+                                          {user.name}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                  {assigningTicket === ticket.id && (
+                                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-[#032F60]"></div>
+                                  )}
+                                </div>
+                                <Button variant="ghost" size="sm">
+                                  <Eye size={16} />
+                                </Button>
                               </div>
                             </div>
-                            <Button variant="ghost" size="sm">
-                              <Eye size={16} />
-                            </Button>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </ScrollArea>
+            </div>
+          )}
+
+          {activeView === "admin" && isAdmin && (
+            <div className="h-full flex flex-col">
+              {/* Stats Cards */}
+              {allTicketStats && (
+                <div className="p-6 border-b border-gray-200">
+                  <h3 className="text-lg font-semibold text-gray-800 mb-4">
+                    All Tickets (Admin View)
+                  </h3>
+                  <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                    <Card className="p-4">
+                      <div className="text-center">
+                        <div className="text-2xl font-bold text-[#032F60]">
+                          {allTicketStats.total}
+                        </div>
+                        <div className="text-xs text-gray-500">Total</div>
+                      </div>
+                    </Card>
+                    <Card className="p-4">
+                      <div className="text-center">
+                        <div className="text-2xl font-bold text-blue-600">
+                          {allTicketStats.open}
+                        </div>
+                        <div className="text-xs text-gray-500">Open</div>
+                      </div>
+                    </Card>
+                    <Card className="p-4">
+                      <div className="text-center">
+                        <div className="text-2xl font-bold text-purple-600">
+                          {allTicketStats.in_progress}
+                        </div>
+                        <div className="text-xs text-gray-500">In Progress</div>
+                      </div>
+                    </Card>
+                    <Card className="p-4">
+                      <div className="text-center">
+                        <div className="text-2xl font-bold text-green-600">
+                          {allTicketStats.resolved}
+                        </div>
+                        <div className="text-xs text-gray-500">Resolved</div>
+                      </div>
+                    </Card>
+                    <Card className="p-4">
+                      <div className="text-center">
+                        <div className="text-2xl font-bold text-red-600">
+                          {allTicketStats.high_priority}
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          High Priority
+                        </div>
+                      </div>
+                    </Card>
                   </div>
-                )}
+                </div>
+              )}
+
+              {/* Filters */}
+              <div className="p-6 border-b border-gray-200">
+                <div className="flex flex-wrap gap-4">
+                  <div className="flex-1 min-w-[200px]">
+                    <div className="relative">
+                      <Search
+                        size={16}
+                        className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
+                      />
+                      <Input
+                        placeholder="Search all tickets..."
+                        value={filters.search}
+                        onChange={(e) =>
+                          setFilters((prev) => ({
+                            ...prev,
+                            search: e.target.value,
+                          }))
+                        }
+                        className="pl-10"
+                      />
+                    </div>
+                  </div>
+                  <Select
+                    value={filters.status}
+                    onValueChange={(value) =>
+                      setFilters((prev) => ({ ...prev, status: value }))
+                    }
+                  >
+                    <SelectTrigger className="w-[140px]">
+                      <SelectValue placeholder="All Status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Status</SelectItem>
+                      <SelectItem value="active">Active Only</SelectItem>
+                      <SelectItem value="open">Open</SelectItem>
+                      <SelectItem value="in_progress">In Progress</SelectItem>
+                      <SelectItem value="resolved">Resolved</SelectItem>
+                      <SelectItem value="closed">Closed</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Select
+                    value={filters.category}
+                    onValueChange={(value) =>
+                      setFilters((prev) => ({ ...prev, category: value }))
+                    }
+                  >
+                    <SelectTrigger className="w-[160px]">
+                      <SelectValue placeholder="All Categories" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Categories</SelectItem>
+                      {categories.map((category) => (
+                        <SelectItem
+                          key={category.id}
+                          value={category.id || `category-${category.name}`}
+                        >
+                          {category.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Select
+                    value={filters.priority}
+                    onValueChange={(value) =>
+                      setFilters((prev) => ({ ...prev, priority: value }))
+                    }
+                  >
+                    <SelectTrigger className="w-[140px]">
+                      <SelectValue placeholder="All Priority" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Priority</SelectItem>
+                      <SelectItem value="urgent">Urgent</SelectItem>
+                      <SelectItem value="high">High</SelectItem>
+                      <SelectItem value="medium">Medium</SelectItem>
+                      <SelectItem value="low">Low</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Select
+                    value={sortBy}
+                    onValueChange={(value) => setSortBy(value)}
+                  >
+                    <SelectTrigger className="w-[140px]">
+                      <SelectValue placeholder="Sort by" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="oldest">Oldest First</SelectItem>
+                      <SelectItem value="newest">Newest First</SelectItem>
+                      <SelectItem value="priority">Priority</SelectItem>
+                      <SelectItem value="status">Status</SelectItem>
+                      <SelectItem value="title">Title A-Z</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
+
+              {/* All Tickets List */}
+              <ScrollArea className="flex-1">
+                <div className="p-6">
+                  {loading ? (
+                    <div className="flex items-center justify-center py-12">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#032F60]"></div>
+                    </div>
+                  ) : filteredAllTickets.length === 0 ? (
+                    <div className="text-center py-12">
+                      <MessageSquare
+                        size={48}
+                        className="mx-auto mb-4 text-gray-400"
+                      />
+                      <h3 className="text-lg font-semibold text-gray-600 mb-2">
+                        {allTickets.length === 0
+                          ? "No tickets in the system"
+                          : "No tickets match your filters"}
+                      </h3>
+                      <p className="text-gray-500 mb-4">
+                        {allTickets.length === 0
+                          ? "No tickets have been created yet"
+                          : "Try adjusting your search or filter criteria"}
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {filteredAllTickets.map((ticket) => (
+                        <Card
+                          key={ticket.id}
+                          className="hover:shadow-md transition-shadow cursor-pointer"
+                          onClick={() => viewTicket(ticket)}
+                        >
+                          <CardContent className="p-4">
+                            <div className="flex items-start justify-between">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-3 mb-2">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-xs font-mono text-blue-600 bg-blue-50 px-2 py-1 rounded">
+                                      {ticket.ticket_number}
+                                    </span>
+                                    <h3 className="font-semibold text-gray-800 line-clamp-1">
+                                      {ticket.title}
+                                    </h3>
+                                  </div>
+                                  <Badge
+                                    className={`text-xs ${getPriorityColor(ticket.priority)}`}
+                                  >
+                                    <div className="flex items-center gap-1">
+                                      {getPriorityIcon(ticket.priority)}
+                                      {ticket.priority.toUpperCase()}
+                                    </div>
+                                  </Badge>
+                                  <Badge
+                                    className={`text-xs ${getStatusColor(ticket.status)}`}
+                                  >
+                                    {ticket.status
+                                      .replace("_", " ")
+                                      .toUpperCase()}
+                                  </Badge>
+                                </div>
+                                <p className="text-sm text-gray-600 line-clamp-2 mb-3">
+                                  {ticket.description}
+                                </p>
+                                <div className="flex items-center gap-4 text-xs text-gray-500">
+                                  <div className="flex items-center gap-1">
+                                    <Tag size={12} />
+                                    {categories.find(
+                                      (c) => c.id === ticket.category,
+                                    )?.name || ticket.category}
+                                  </div>
+                                  {ticket.user && (
+                                    <div className="flex items-center gap-1">
+                                      <User size={12} />
+                                      Created by: {ticket.user.name}
+                                    </div>
+                                  )}
+                                  {ticket.assigned_user && (
+                                    <div className="flex items-center gap-1">
+                                      <User size={12} />
+                                      Assigned to: {ticket.assigned_user.name}
+                                    </div>
+                                  )}
+                                  {ticket.loan_number && (
+                                    <div className="flex items-center gap-1">
+                                      <FileText size={12} />
+                                      {ticket.loan_number}
+                                    </div>
+                                  )}
+                                  {ticket.client_name && (
+                                    <div className="flex items-center gap-1">
+                                      <User size={12} />
+                                      {ticket.client_name}
+                                    </div>
+                                  )}
+                                  <div className="flex items-center gap-1">
+                                    <Calendar size={12} />
+                                    {new Date(
+                                      ticket.created_at,
+                                    ).toLocaleDateString()}
+                                  </div>
+                                  {ticket.attachments &&
+                                    ticket.attachments.length > 0 && (
+                                      <div className="flex items-center gap-1">
+                                        <Paperclip size={12} />
+                                        {ticket.attachments.length} file
+                                        {ticket.attachments.length !== 1
+                                          ? "s"
+                                          : ""}
+                                      </div>
+                                    )}
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                {/* Assignment Dropdown */}
+                                <div
+                                  className="flex items-center gap-2"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <Select
+                                    value={
+                                      ticket.assigned_user?.id || "unassigned"
+                                    }
+                                    onValueChange={(value) =>
+                                      handleAssignTicket(
+                                        ticket.id,
+                                        value === "unassigned" ? "" : value,
+                                      )
+                                    }
+                                    disabled={assigningTicket === ticket.id}
+                                  >
+                                    <SelectTrigger className="w-[140px] h-8 text-xs">
+                                      <SelectValue placeholder="Assign to..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="unassigned">
+                                        <span className="text-gray-500">
+                                          Unassigned
+                                        </span>
+                                      </SelectItem>
+                                      {allUsers.map((user) => (
+                                        <SelectItem
+                                          key={user.id}
+                                          value={user.id}
+                                        >
+                                          {user.name}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                  {assigningTicket === ticket.id && (
+                                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-[#032F60]"></div>
+                                  )}
+                                </div>
+                                <Button variant="ghost" size="sm">
+                                  <Eye size={16} />
+                                </Button>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </ScrollArea>
             </div>
           )}
 
@@ -1403,9 +2296,14 @@ export default function PITSystem({ onClose }: PITSystemProps) {
                       >
                         ← Back
                       </Button>
-                      <h2 className="text-xl font-bold text-gray-800">
-                        {selectedTicket.title}
-                      </h2>
+                      <div className="flex items-center gap-3">
+                        <span className="text-sm font-mono text-blue-600 bg-blue-50 px-3 py-1 rounded">
+                          {selectedTicket.ticket_number}
+                        </span>
+                        <h2 className="text-xl font-bold text-gray-800">
+                          {selectedTicket.title}
+                        </h2>
+                      </div>
                     </div>
                     <div className="flex items-center gap-3 mb-3">
                       <Badge
@@ -1426,6 +2324,11 @@ export default function PITSystem({ onClose }: PITSystemProps) {
                           (c) => c.id === selectedTicket.category,
                         )?.name || selectedTicket.category}
                       </span>
+                      {selectedTicket.assigned_user && (
+                        <span className="text-sm text-blue-600">
+                          Assigned to: {selectedTicket.assigned_user.name}
+                        </span>
+                      )}
                     </div>
                     <div className="flex items-center gap-4 text-sm text-gray-500">
                       <div className="flex items-center gap-1">
@@ -1497,84 +2400,210 @@ export default function PITSystem({ onClose }: PITSystemProps) {
               </div>
 
               {/* Comments Section */}
-              <div className="flex-1 flex flex-col">
-                <div className="p-6 border-b border-gray-200">
+              <div className="flex-1 flex flex-col min-h-0">
+                <div className="p-6 border-b border-gray-200 flex-shrink-0">
                   <h3 className="font-semibold text-gray-800 mb-4">
                     Comments & Updates
                   </h3>
                 </div>
 
-                <ScrollArea className="flex-1 p-6">
-                  <div className="space-y-4">
-                    {ticketComments.length === 0 ? (
-                      <div className="text-center py-8 text-gray-500">
-                        No comments yet. Be the first to add an update!
-                      </div>
-                    ) : (
-                      ticketComments.map((comment) => (
-                        <div key={comment.id} className="flex gap-3">
-                          <Avatar className="w-8 h-8 flex-shrink-0">
-                            <AvatarImage src={comment.user.avatar} />
-                            <AvatarFallback>
-                              {comment.user.name?.charAt(0) || "U"}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-1">
-                              <span className="font-medium text-sm">
-                                {comment.user.name}
-                              </span>
-                              <span className="text-xs text-gray-500">
-                                {new Date(comment.created_at).toLocaleString()}
-                              </span>
-                              {comment.is_internal && (
-                                <Badge variant="outline" className="text-xs">
-                                  Internal
-                                </Badge>
-                              )}
-                            </div>
-                            <div className="bg-gray-50 rounded-lg p-3">
-                              <p className="text-sm text-gray-700 whitespace-pre-wrap">
-                                {comment.comment}
-                              </p>
-                            </div>
+                <div className="flex-1 min-h-0">
+                  <ScrollArea className="h-full">
+                    <div className="p-6">
+                      <div className="space-y-4">
+                        {ticketComments.length === 0 ? (
+                          <div className="text-center py-8 text-gray-500">
+                            No comments yet. Be the first to add an update!
                           </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </ScrollArea>
+                        ) : (
+                          ticketComments.map((comment) => (
+                            <div key={comment.id} className="flex gap-3">
+                              <Avatar className="w-8 h-8 flex-shrink-0">
+                                <AvatarImage src={comment.user.avatar} />
+                                <AvatarFallback>
+                                  {comment.user.name?.charAt(0) || "U"}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <span className="font-medium text-sm">
+                                    {comment.user.name}
+                                  </span>
+                                  <span className="text-xs text-gray-500">
+                                    {new Date(
+                                      comment.created_at,
+                                    ).toLocaleString()}
+                                  </span>
+                                  {comment.is_internal && (
+                                    <Badge
+                                      variant="outline"
+                                      className="text-xs"
+                                    >
+                                      Internal
+                                    </Badge>
+                                  )}
+                                </div>
+                                <div className="bg-gray-50 rounded-lg p-3">
+                                  <p className="text-sm text-gray-700 whitespace-pre-wrap">
+                                    {comment.comment}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  </ScrollArea>
+                </div>
+
+                {/* Ticket Actions */}
+                {selectedTicket.status !== "resolved" &&
+                  selectedTicket.status !== "closed" && (
+                    <div className="p-6 border-t border-gray-200">
+                      <h4 className="text-sm font-semibold text-gray-800 mb-3">
+                        How would you like to proceed with this ticket?
+                      </h4>
+                      <div className="flex flex-wrap gap-3 mb-4">
+                        {/* Show different actions based on user role */}
+                        {selectedTicket.assigned_user?.id === user?.id ? (
+                          // Actions for assigned user
+                          <>
+                            {selectedTicket.status === "open" && (
+                              <Button
+                                onClick={() =>
+                                  handleTicketAction("in_progress")
+                                }
+                                className="bg-blue-600 hover:bg-blue-700 text-white"
+                                size="sm"
+                              >
+                                <Clock size={16} className="mr-2" />
+                                Mark In Progress
+                              </Button>
+                            )}
+                            <Button
+                              onClick={() => handleTicketAction("satisfied")}
+                              className="bg-green-600 hover:bg-green-700 text-white"
+                              size="sm"
+                            >
+                              <CheckCircle size={16} className="mr-2" />
+                              Mark as Resolved
+                            </Button>
+                          </>
+                        ) : (
+                          // Actions for ticket creator
+                          <>
+                            <Button
+                              onClick={() => handleTicketAction("satisfied")}
+                              className="bg-green-600 hover:bg-green-700 text-white"
+                              size="sm"
+                            >
+                              <CheckCircle size={16} className="mr-2" />
+                              I'm Satisfied
+                            </Button>
+                            <Button
+                              onClick={() =>
+                                handleTicketAction("not_satisfied")
+                              }
+                              className="bg-red-600 hover:bg-red-700 text-white"
+                              size="sm"
+                            >
+                              <AlertCircle size={16} className="mr-2" />
+                              I'm Not Satisfied Yet
+                            </Button>
+                            <Button
+                              onClick={() =>
+                                handleTicketAction("clarification")
+                              }
+                              className="bg-yellow-600 hover:bg-yellow-700 text-white"
+                              size="sm"
+                            >
+                              <Info size={16} className="mr-2" />I Need
+                              Clarification
+                            </Button>
+                          </>
+                        )}
+                        {isAdmin && (
+                          <Button
+                            onClick={handleForceClose}
+                            className="bg-gray-600 hover:bg-gray-700 text-white"
+                            size="sm"
+                          >
+                            <X size={16} className="mr-2" />
+                            Force Close
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  )}
 
                 {/* Add Comment */}
                 <div className="p-6 border-t border-gray-200">
-                  <div className="flex gap-3">
-                    <Avatar className="w-8 h-8 flex-shrink-0">
-                      <AvatarImage src={user?.avatar} />
-                      <AvatarFallback>
-                        {user?.name?.charAt(0) || "U"}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1">
-                      <Textarea
-                        value={newComment}
-                        onChange={(e) => setNewComment(e.target.value)}
-                        placeholder="Add a comment or update..."
-                        rows={3}
-                        className="mb-3"
-                      />
-                      <div className="flex justify-end">
-                        <Button
-                          onClick={handleAddComment}
-                          disabled={!newComment.trim()}
-                          size="sm"
-                          className="bg-[#032F60] hover:bg-[#1a4a73]"
-                        >
-                          <Send size={14} className="mr-2" />
-                          Add Comment
-                        </Button>
+                  {/* Show message if ticket is not assigned */}
+                  {!selectedTicket.assigned_user && !isAdmin ? (
+                    <div className="text-center py-4">
+                      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                        <div className="flex items-center justify-center gap-2 text-yellow-800">
+                          <AlertCircle size={20} />
+                          <span className="font-medium">
+                            Comments are locked until this ticket is assigned
+                          </span>
+                        </div>
+                        <p className="text-sm text-yellow-700 mt-2">
+                          An administrator will assign this ticket to the
+                          appropriate team member soon.
+                        </p>
                       </div>
                     </div>
-                  </div>
+                  ) : (
+                    <div className="flex gap-3">
+                      <Avatar className="w-8 h-8 flex-shrink-0">
+                        <AvatarImage src={user?.avatar} />
+                        <AvatarFallback>
+                          {user?.name?.charAt(0) || "U"}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1">
+                        <Textarea
+                          value={newComment}
+                          onChange={(e) => setNewComment(e.target.value)}
+                          placeholder="Add a comment or update..."
+                          rows={3}
+                          className="mb-3"
+                        />
+                        <div className="flex items-center justify-between">
+                          {isAdmin && (
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="checkbox"
+                                id="replyAsSafire"
+                                checked={replyAsSafire}
+                                onChange={(e) =>
+                                  setReplyAsSafire(e.target.checked)
+                                }
+                                className="rounded"
+                              />
+                              <label
+                                htmlFor="replyAsSafire"
+                                className="text-sm text-gray-600"
+                              >
+                                Reply as Safire Home Lending
+                              </label>
+                            </div>
+                          )}
+                          <Button
+                            onClick={handleAddComment}
+                            disabled={!newComment.trim()}
+                            size="sm"
+                            className="bg-[#032F60] hover:bg-[#1a4a73]"
+                          >
+                            <Send size={14} className="mr-2" />
+                            Add Comment
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
