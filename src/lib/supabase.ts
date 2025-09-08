@@ -186,9 +186,6 @@ export const supabaseHelpers = {
           comments,
           is_featured,
           thumbnail,
-          main_image_url,
-          cta_text,
-          cta_url,
           estimated_read_time,
           duration,
           publish_date,
@@ -465,9 +462,6 @@ export const supabaseHelpers = {
           likes,
           comments,
           thumbnail,
-          main_image_url,
-          cta_text,
-          cta_url,
           estimated_read_time,
           duration,
           publish_date,
@@ -564,7 +558,6 @@ export const supabaseHelpers = {
           videoUrl,
           thumbnailUrl:
             item.thumbnail ||
-            item.main_image_url ||
             (videoId
               ? `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`
               : null),

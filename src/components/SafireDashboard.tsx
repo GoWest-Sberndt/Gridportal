@@ -284,8 +284,8 @@ function CompensationView() {
               (sum, item) => sum + (item.compensation || 0) * 0.16,
               0,
             ),
-            overrides: performanceData.reduce(
-              (sum, item) => sum + (item.compensation || 0) * 0.08,
+            fireFund: performanceData.reduce(
+              (sum, item) => sum + (item.fire_fund_balance || 0),
               0,
             ),
             monthlyData: performanceData.map((item) => ({
@@ -325,7 +325,7 @@ function CompensationView() {
             totalEarnings: 125000,
             baseCommission: 95000,
             bonuses: 20000,
-            overrides: 10000,
+            fireFund: 10000,
             monthlyData: [
               { month: "Jan", amount: 12000 },
               { month: "Feb", amount: 15000 },
@@ -468,18 +468,18 @@ function CompensationView() {
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center gap-2 mb-2">
-              <div className="w-8 h-8 bg-orange-100 rounded-lg flex items-center justify-center">
-                <Users size={16} className="text-orange-600" />
+              <div className="w-8 h-8 bg-red-100 rounded-lg flex items-center justify-center">
+                <Target size={16} className="text-red-600" />
               </div>
               <span className="text-sm font-semibold text-gray-600">
-                Overrides
+                FIRE Fund
               </span>
             </div>
             <div className="text-2xl font-bold text-gray-800">
-              ${compensationData.ytd.overrides.toLocaleString()}
+              ${compensationData.ytd.fireFund.toLocaleString()}
             </div>
-            <div className="text-xs text-orange-600 font-medium">
-              8% of total
+            <div className="text-xs text-red-600 font-medium">
+              FIRE Fund Balance
             </div>
           </CardContent>
         </Card>
@@ -1355,7 +1355,6 @@ export default function SafireDashboard() {
               networkResult,
               uplineResult,
               downlineResult,
-              marketDataResult,
               newsDataResult,
               adsResult,
               videoResult,
@@ -1366,7 +1365,6 @@ export default function SafireDashboard() {
               supabaseHelpers.getUserNetworkSummary(user.id),
               supabaseHelpers.getUserUpline(user.id),
               supabaseHelpers.getUserDownline(user.id),
-              supabaseHelpers.getLatestMarketData(),
               supabaseHelpers.getFeaturedNews(),
               supabaseHelpers.getActiveAds(),
               supabaseHelpers.getFeaturedVideoUrl(),
@@ -1404,36 +1402,6 @@ export default function SafireDashboard() {
             // Update downline users
             if (downlineResult.status === "fulfilled" && downlineResult.value) {
               setDownlineUsers(downlineResult.value);
-            }
-
-            // Update market data if successful
-            if (
-              marketDataResult.status === "fulfilled" &&
-              marketDataResult.value
-            ) {
-              const result = marketDataResult.value;
-              setMarketData({
-                umbs30yr55: {
-                  value: result.umbs_30yr_55?.toString() || "100.01",
-                  change: result.umbs_30yr_55_change?.toString() || "+0.03",
-                  isPositive: result.umbs_30yr_55_positive ?? true,
-                },
-                umbs30yr5: {
-                  value: result.umbs_30yr_5?.toString() || "99.85",
-                  change: result.umbs_30yr_5_change?.toString() || "-0.02",
-                  isPositive: result.umbs_30yr_5_positive ?? false,
-                },
-                umbs30yr6: {
-                  value: result.umbs_30yr_6?.toString() || "100.25",
-                  change: result.umbs_30yr_6_change?.toString() || "+0.05",
-                  isPositive: result.umbs_30yr_6_positive ?? true,
-                },
-                treasury10yr: {
-                  value: result.treasury_10yr?.toString() || "4.236",
-                  change: result.treasury_10yr_change?.toString() || "-0.003",
-                  isPositive: result.treasury_10yr_positive ?? false,
-                },
-              });
             }
 
             // Update news data if successful
@@ -1562,469 +1530,8 @@ export default function SafireDashboard() {
     };
   }, [user?.id]);
 
-  // Fetch market data from multiple sources with timeout and error handling
-  const fetchMarketData = async () => {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
-
-    try {
-      // Fetch 10-year treasury data from Yahoo Finance with timeout
-      const treasuryResponse = await fetch(
-        "https://api.allorigins.win/get?url=" +
-          encodeURIComponent("https://finance.yahoo.com/quote/%5ETNX"),
-        {
-          signal: controller.signal,
-          headers: {
-            Accept: "application/json",
-            "Content-Type": "application/json",
-          },
-        },
-      );
-
-      let treasuryData = null;
-      if (treasuryResponse.ok) {
-        const data = await treasuryResponse.json();
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(data.contents, "text/html");
-
-        // Extract treasury data from Yahoo Finance - try multiple selectors
-        const priceSelectors = [
-          '[data-symbol="^TNX"] [data-field="regularMarketPrice"]',
-          '[data-testid="qsp-price"]',
-          ".Fw\\(b\\).Fz\\(36px\\)",
-          ".Trsdu\\(0\\.3s\\).Fw\\(b\\).Fz\\(36px\\)",
-          'fin-streamer[data-field="regularMarketPrice"]',
-        ];
-
-        const changeSelectors = [
-          '[data-symbol="^TNX"] [data-field="regularMarketChange"]',
-          '[data-testid="qsp-price-change"]',
-          ".Fw\\(500\\)",
-          'fin-streamer[data-field="regularMarketChange"]',
-        ];
-
-        let priceElement = null;
-        let changeElement = null;
-
-        // Try each selector until we find the data
-        for (const selector of priceSelectors) {
-          priceElement = doc.querySelector(selector);
-          if (priceElement && priceElement.textContent?.trim()) break;
-        }
-
-        for (const selector of changeSelectors) {
-          changeElement = doc.querySelector(selector);
-          if (changeElement && changeElement.textContent?.trim()) break;
-        }
-
-        // Fallback: try to extract from script tags containing JSON data
-        if (!priceElement || !changeElement) {
-          const scripts = doc.querySelectorAll("script");
-          for (const script of scripts) {
-            const content = script.textContent || "";
-            if (
-              content.includes('"regularMarketPrice"') &&
-              content.includes("^TNX")
-            ) {
-              try {
-                // Extract JSON data from script
-                const jsonMatch = content.match(
-                  /root\.App\.main\s*=\s*(\{.*?\});/,
-                );
-                if (jsonMatch) {
-                  const jsonData = JSON.parse(jsonMatch[1]);
-                  const quoteData =
-                    jsonData?.context?.dispatcher?.stores?.QuoteSummaryStore
-                      ?.price;
-                  if (quoteData) {
-                    const price =
-                      quoteData.regularMarketPrice?.raw ||
-                      quoteData.regularMarketPrice?.fmt;
-                    const change =
-                      quoteData.regularMarketChange?.raw ||
-                      quoteData.regularMarketChange?.fmt;
-                    if (price && change !== undefined) {
-                      treasuryData = {
-                        value: parseFloat(price).toFixed(3),
-                        change: parseFloat(change).toFixed(3),
-                        isPositive: parseFloat(change) >= 0,
-                      };
-                      break;
-                    }
-                  }
-                }
-              } catch (e) {
-                console.log("Failed to parse JSON from script:", e);
-              }
-            }
-          }
-        }
-
-        // If we found elements, extract the data
-        if (!treasuryData && priceElement && changeElement) {
-          const price = priceElement.textContent?.trim();
-          const changeText = changeElement.textContent?.trim();
-          const priceMatch = price?.match(/([0-9]+\.?[0-9]*)/)?.[1];
-          const changeMatch = changeText?.match(/([+-]?[0-9]+\.?[0-9]*)/)?.[1];
-
-          if (priceMatch && changeMatch) {
-            treasuryData = {
-              value: parseFloat(priceMatch).toFixed(3),
-              change: parseFloat(changeMatch).toFixed(3),
-              isPositive:
-                !changeText?.includes("-") && parseFloat(changeMatch) >= 0,
-            };
-          }
-        }
-      }
-
-      // Fetch UMBS data from multiple reliable sources
-      let umbsData = {};
-
-      // Try Federal Reserve Economic Data (FRED) API for UMBS data
-      try {
-        const fredApiKey = "demo"; // In production, use a real API key
-        const fredResponse = await fetch(
-          `https://api.stlouisfed.org/fred/series/observations?series_id=MORTGAGE30US&api_key=${fredApiKey}&file_type=json&limit=1&sort_order=desc`,
-        );
-
-        if (fredResponse.ok) {
-          const fredData = await fredResponse.json();
-          if (fredData.observations && fredData.observations.length > 0) {
-            const latestRate = parseFloat(fredData.observations[0].value);
-            // Calculate UMBS prices based on mortgage rates (simplified calculation)
-            const basePrice = 100;
-            const rate5 = latestRate - 0.5;
-            const rate55 = latestRate;
-            const rate6 = latestRate + 0.5;
-
-            umbsData = {
-              umbs30yr5: {
-                value: (basePrice + (6 - rate5) * 0.8).toFixed(2),
-                change: ((Math.random() - 0.5) * 0.1).toFixed(3),
-                isPositive: Math.random() > 0.5,
-              },
-              umbs30yr55: {
-                value: (basePrice + (6 - rate55) * 0.8).toFixed(2),
-                change: ((Math.random() - 0.5) * 0.1).toFixed(3),
-                isPositive: Math.random() > 0.5,
-              },
-              umbs30yr6: {
-                value: (basePrice + (6 - rate6) * 0.8).toFixed(2),
-                change: ((Math.random() - 0.5) * 0.1).toFixed(3),
-                isPositive: Math.random() > 0.5,
-              },
-            };
-          }
-        }
-      } catch (fredError) {
-        console.log("FRED API failed, trying alternative sources:", fredError);
-      }
-
-      // Fallback: Try Mortgage News Daily
-      if (Object.keys(umbsData).length === 0) {
-        try {
-          const mndResponse = await fetch(
-            "https://api.allorigins.win/get?url=" +
-              encodeURIComponent("https://www.mortgagenewsdaily.com/markets"),
-          );
-
-          if (mndResponse.ok) {
-            const data = await mndResponse.json();
-            const parser = new DOMParser();
-            const doc = parser.parseFromString(data.contents, "text/html");
-
-            // Look for UMBS data in various formats
-            const umbsElements = doc.querySelectorAll("*");
-            const umbsRegex = /UMBS.*?(\d+\.\d+).*?([+-]\d+\.\d+)/gi;
-
-            for (const element of umbsElements) {
-              const text = element.textContent || "";
-              if (text.includes("UMBS") || text.includes("30YR")) {
-                const matches = [...text.matchAll(umbsRegex)];
-                if (matches.length > 0) {
-                  // Extract UMBS data from matches
-                  matches.forEach((match, index) => {
-                    const rate = index === 0 ? "5" : index === 1 ? "55" : "6";
-                    const key = `umbs30yr${rate === "55" ? "55" : rate}`;
-                    umbsData[key] = {
-                      value: match[1],
-                      change: match[2],
-                      isPositive: !match[2].startsWith("-"),
-                    };
-                  });
-                  break;
-                }
-              }
-            }
-          }
-        } catch (mndError) {
-          console.log("Mortgage News Daily failed:", mndError);
-        }
-      }
-
-      // Fallback: Try Yahoo Finance for mortgage-related securities
-      if (Object.keys(umbsData).length === 0) {
-        try {
-          const symbols = ["VMBS", "MBB", "FMHI"]; // Mortgage-backed securities ETFs
-          const promises = symbols.map((symbol) =>
-            fetch(
-              "https://api.allorigins.win/get?url=" +
-                encodeURIComponent(`https://finance.yahoo.com/quote/${symbol}`),
-            ),
-          );
-
-          const responses = await Promise.all(promises);
-          const validResponses = await Promise.all(
-            responses.map(async (response, index) => {
-              if (response.ok) {
-                const data = await response.json();
-                const parser = new DOMParser();
-                const doc = parser.parseFromString(data.contents, "text/html");
-
-                const priceElement = doc.querySelector(
-                  'fin-streamer[data-field="regularMarketPrice"], [data-testid="qsp-price"]',
-                );
-                const changeElement = doc.querySelector(
-                  'fin-streamer[data-field="regularMarketChange"], [data-testid="qsp-price-change"]',
-                );
-
-                if (priceElement && changeElement) {
-                  return {
-                    symbol: symbols[index],
-                    price: parseFloat(priceElement.textContent || "0"),
-                    change: parseFloat(changeElement.textContent || "0"),
-                  };
-                }
-              }
-              return null;
-            }),
-          );
-
-          const validData = validResponses.filter(Boolean);
-          if (validData.length > 0) {
-            // Use the first valid MBS ETF data as a proxy for UMBS
-            const baseData = validData[0];
-            umbsData = {
-              umbs30yr5: {
-                value: (baseData.price * 0.98).toFixed(2),
-                change: (baseData.change * 0.8).toFixed(3),
-                isPositive: baseData.change >= 0,
-              },
-              umbs30yr55: {
-                value: baseData.price.toFixed(2),
-                change: baseData.change.toFixed(3),
-                isPositive: baseData.change >= 0,
-              },
-              umbs30yr6: {
-                value: (baseData.price * 1.02).toFixed(2),
-                change: (baseData.change * 1.2).toFixed(3),
-                isPositive: baseData.change >= 0,
-              },
-            };
-          }
-        } catch (yahooError) {
-          console.log("Yahoo Finance MBS data failed:", yahooError);
-        }
-      }
-
-      // Final fallback: Use current market data with small variations
-      if (Object.keys(umbsData).length === 0) {
-        umbsData = {
-          umbs30yr5: {
-            value: (
-              parseFloat(marketData.umbs30yr5.value) +
-              (Math.random() - 0.5) * 0.05
-            ).toFixed(2),
-            change: ((Math.random() - 0.5) * 0.05).toFixed(3),
-            isPositive: Math.random() > 0.5,
-          },
-          umbs30yr55: {
-            value: (
-              parseFloat(marketData.umbs30yr55.value) +
-              (Math.random() - 0.5) * 0.05
-            ).toFixed(2),
-            change: ((Math.random() - 0.5) * 0.05).toFixed(3),
-            isPositive: Math.random() > 0.5,
-          },
-          umbs30yr6: {
-            value: (
-              parseFloat(marketData.umbs30yr6.value) +
-              (Math.random() - 0.5) * 0.05
-            ).toFixed(2),
-            change: ((Math.random() - 0.5) * 0.05).toFixed(3),
-            isPositive: Math.random() > 0.5,
-          },
-        };
-      }
-
-      // Update market data with fetched information
-      setMarketData((prev) => ({
-        ...prev,
-        ...umbsData,
-        treasury10yr: treasuryData || prev.treasury10yr,
-      }));
-    } catch (error) {
-      console.error("Error fetching market data:", error);
-
-      // Clear timeout if still active
-      clearTimeout(timeoutId);
-
-      // If it's an abort error, don't try alternatives
-      if (error.name === "AbortError") {
-        console.log("Market data fetch was aborted due to timeout");
-        return;
-      }
-
-      // Try alternative data source for 10-year treasury
-      try {
-        const alternativeResponse = await fetch(
-          "https://api.allorigins.win/get?url=" +
-            encodeURIComponent(
-              "https://www.marketwatch.com/investing/bond/tmubmusd10y",
-            ),
-        );
-
-        if (alternativeResponse.ok) {
-          const data = await alternativeResponse.json();
-          const parser = new DOMParser();
-          const doc = parser.parseFromString(data.contents, "text/html");
-
-          // Try to extract from MarketWatch
-          const priceElement = doc.querySelector(
-            '.value, .last-price, [data-module="LastPrice"]',
-          );
-          const changeElement = doc.querySelector(
-            '.change, .change--point, [data-module="Change"]',
-          );
-
-          if (priceElement && changeElement) {
-            const price = priceElement.textContent?.trim();
-            const changeText = changeElement.textContent?.trim();
-            const priceMatch = price?.match(/([0-9]+\.?[0-9]*)/)?.[1];
-            const changeMatch = changeText?.match(
-              /([+-]?[0-9]+\.?[0-9]*)/,
-            )?.[1];
-
-            if (priceMatch && changeMatch) {
-              setMarketData((prev) => ({
-                ...prev,
-                treasury10yr: {
-                  value: parseFloat(priceMatch).toFixed(3),
-                  change: parseFloat(changeMatch).toFixed(3),
-                  isPositive:
-                    !changeText?.includes("-") && parseFloat(changeMatch) >= 0,
-                },
-              }));
-              return; // Exit early if successful
-            }
-          }
-        }
-      } catch (altError) {
-        console.error("Alternative data source also failed:", altError);
-      }
-
-      // Fallback: Use more realistic demo data based on recent market conditions
-      setMarketData((prev) => {
-        // Use 4.236 as base for treasury (the value user mentioned)
-        const treasuryBase = 4.236;
-        const treasuryVariation = (Math.random() - 0.5) * 0.02; // Small variation
-        const treasuryChange = (Math.random() - 0.5) * 0.05;
-
-        return {
-          umbs30yr55: {
-            value: (
-              parseFloat(prev.umbs30yr55.value) +
-              (Math.random() - 0.5) * 0.05
-            ).toFixed(2),
-            change: ((Math.random() - 0.5) * 0.05).toFixed(3),
-            isPositive: Math.random() > 0.5,
-          },
-          umbs30yr5: {
-            value: (
-              parseFloat(prev.umbs30yr5.value) +
-              (Math.random() - 0.5) * 0.05
-            ).toFixed(2),
-            change: ((Math.random() - 0.5) * 0.05).toFixed(3),
-            isPositive: Math.random() > 0.5,
-          },
-          umbs30yr6: {
-            value: (
-              parseFloat(prev.umbs30yr6.value) +
-              (Math.random() - 0.5) * 0.05
-            ).toFixed(2),
-            change: ((Math.random() - 0.5) * 0.05).toFixed(3),
-            isPositive: Math.random() > 0.5,
-          },
-          treasury10yr: {
-            value: (treasuryBase + treasuryVariation).toFixed(3),
-            change: treasuryChange.toFixed(3),
-            isPositive: treasuryChange >= 0,
-          },
-        };
-      });
-    }
-  };
-
-  // Fetch news data from RSS feed with timeout and error handling
-  const fetchNewsData = async () => {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
-
-    try {
-      // Use a CORS proxy to fetch the RSS feed with timeout
-      const response = await fetch(
-        "https://api.allorigins.win/get?url=" +
-          encodeURIComponent("http://www.mortgagenewsdaily.com/rss/news"),
-        {
-          signal: controller.signal,
-          headers: {
-            Accept: "application/json",
-            "Content-Type": "application/json",
-          },
-        },
-      );
-
-      if (response.ok) {
-        const data = await response.json();
-        const parser = new DOMParser();
-        const xmlDoc = parser.parseFromString(data.contents, "text/xml");
-
-        const items = xmlDoc.querySelectorAll("item");
-        if (items.length > 0) {
-          const firstItem = items[0];
-          const title = firstItem.querySelector("title")?.textContent || "";
-          const description =
-            firstItem.querySelector("description")?.textContent || "";
-          const pubDate = firstItem.querySelector("pubDate")?.textContent || "";
-
-          setNewsData({
-            title: title.substring(0, 100) + (title.length > 100 ? "..." : ""),
-            content:
-              description.substring(0, 200) +
-              (description.length > 200 ? "…" : ""),
-            publishedAt: pubDate,
-          });
-        }
-      }
-    } catch (error) {
-      console.error("Error fetching news data:", error);
-
-      // Clear timeout if still active
-      clearTimeout(timeoutId);
-
-      // If it's an abort error, don't log as error
-      if (error.name === "AbortError") {
-        console.log("News data fetch was aborted due to timeout");
-      }
-
-      // Keep existing news data on error
-    }
-  };
-
   // Set up intervals for data fetching and ad rotation with error handling
   useEffect(() => {
-    let marketInterval: NodeJS.Timeout;
     let newsInterval: NodeJS.Timeout;
     let adRotationInterval: NodeJS.Timeout;
     let isComponentMounted = true;
@@ -2038,20 +1545,6 @@ export default function SafireDashboard() {
         // Don't crash the app, just log the error
       }
     };
-
-    // Initial fetch with error handling
-    safeExecute(fetchMarketData, "fetchMarketData");
-    safeExecute(fetchNewsData, "fetchNewsData");
-
-    // Set up market data interval (every 2 minutes to reduce load)
-    marketInterval = setInterval(() => {
-      safeExecute(fetchMarketData, "fetchMarketData");
-    }, 120000);
-
-    // Set up news data interval (every 2 hours to reduce load)
-    newsInterval = setInterval(() => {
-      safeExecute(fetchNewsData, "fetchNewsData");
-    }, 7200000);
 
     // Ad rotation interval - rotate through active ads every 10 seconds
     if (activeAds.length > 1) {
@@ -2079,7 +1572,6 @@ export default function SafireDashboard() {
     // Cleanup intervals on unmount
     return () => {
       isComponentMounted = false;
-      if (marketInterval) clearInterval(marketInterval);
       if (newsInterval) clearInterval(newsInterval);
       if (adRotationInterval) clearInterval(adRotationInterval);
       if (videoRotationInterval) clearInterval(videoRotationInterval);
@@ -2138,7 +1630,7 @@ export default function SafireDashboard() {
                       "Dashboard"}
                   </h1>
                 </div>
-                <div className="flex items-center gap-3 flex-1 justify-center">
+                <div className="flex items-center gap-3 flex-1">
                   <div className="flex items-center bg-white rounded-full shadow-sm border border-gray-200 px-4 py-2 w-full max-w-md">
                     <input
                       type="text"
@@ -2147,6 +1639,48 @@ export default function SafireDashboard() {
                     />
                     <button className="ml-3 p-1 hover:bg-gray-300 rounded-full transition-colors">
                       <SearchIcon size={16} className="text-gray-700" />
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-2 ml-auto">
+                    <button
+                      onClick={() =>
+                        window.open("https://email.gowestlending.com", "_blank")
+                      }
+                      className="w-10 h-10 bg-white hover:bg-gray-50 rounded-full flex items-center justify-center transition-colors shadow-sm overflow-hidden"
+                      title="Email"
+                    >
+                      <img
+                        src="/images/outlook-logo.png"
+                        alt="Outlook"
+                        className="w-[75%] h-[75%] object-cover"
+                      />
+                    </button>
+                    <button
+                      onClick={() =>
+                        window.open(
+                          "https://app.advisoradvantage.app",
+                          "_blank",
+                        )
+                      }
+                      className="w-10 h-10 bg-[#5DADE2] hover:bg-[#3498DB] rounded-full flex items-center justify-center transition-colors shadow-sm"
+                      title="Advisor Advantage"
+                    >
+                      <img
+                        src="/advisor-advantage-icon.png"
+                        alt="Advisor Advantage"
+                        className="w-10 h-10 rounded-full object-cover"
+                      />
+                    </button>
+                    <button
+                      onClick={() => window.open("https://ro.am/r/", "_blank")}
+                      className="w-10 h-10 bg-[#032F60] hover:bg-[#1a4a73] rounded-full flex items-center justify-center transition-colors shadow-sm overflow-hidden"
+                      title="Roam"
+                    >
+                      <img
+                        src="/roam-icon.png"
+                        alt="Roam"
+                        className="w-full h-full object-cover"
+                      />
                     </button>
                   </div>
                   <button
@@ -5469,8 +5003,8 @@ function DashboardQuickView({
                     </div>
                     <div className="flex items-center justify-between text-sm">
                       <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 bg-purple-500 rounded-full"></div>
-                        <span>Overrides</span>
+                        <div className="w-3 h-3 bg-red-500 rounded-full"></div>
+                        <span>FIRE Fund</span>
                       </div>
                       <span className="font-semibold">8%</span>
                     </div>

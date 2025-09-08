@@ -71,8 +71,8 @@ export default function CompensationWorkspace({
               (sum, item) => sum + (item.compensation || 0) * 0.16,
               0,
             ),
-            overrides: performanceData.reduce(
-              (sum, item) => sum + (item.compensation || 0) * 0.08,
+            fireFund: performanceData.reduce(
+              (sum, item) => sum + (item.fire_fund_balance || 0),
               0,
             ),
             monthlyData: performanceData.map((item) => ({
@@ -112,7 +112,7 @@ export default function CompensationWorkspace({
             totalEarnings: 125000,
             baseCommission: 95000,
             bonuses: 20000,
-            overrides: 10000,
+            fireFund: 10000,
             monthlyData: [
               { month: "Jan", amount: 12000 },
               { month: "Feb", amount: 15000 },
@@ -303,17 +303,17 @@ export default function CompensationWorkspace({
               <CardContent className="p-4">
                 <div className="flex items-center gap-2 mb-2">
                   <div className="w-8 h-8 bg-orange-100 rounded-lg flex items-center justify-center">
-                    <Users size={16} className="text-orange-600" />
+                    <Target size={16} className="text-orange-600" />
                   </div>
                   <span className="text-sm font-semibold text-gray-600">
-                    Overrides
+                    FIRE Fund
                   </span>
                 </div>
                 <div className="text-2xl font-bold text-gray-800">
-                  ${compensationData.ytd.overrides.toLocaleString()}
+                  ${compensationData.ytd.fireFund.toLocaleString()}
                 </div>
                 <div className="text-xs text-orange-600 font-medium">
-                  8% of total
+                  FIRE Fund Balance
                 </div>
               </CardContent>
             </Card>
