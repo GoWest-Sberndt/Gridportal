@@ -66,6 +66,7 @@ import { Label } from "@/components/ui/label";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabaseHelpers, supabase } from "@/lib/supabase";
 import PITSystem from "@/components/PITSystem";
+import AdminQuickAccessManager from "@/components/AdminQuickAccessManager";
 
 interface AdminDashboardProps {
   className?: string;
@@ -1340,7 +1341,7 @@ export default function AdminDashboard({
   const handleDeleteUser = async (userId) => {
     if (
       !confirm(
-        "Are you sure you want to delete this user? This action cannot be undone.",
+        "Are you sure you want to delete this user? This action cannot be undone."
       )
     ) {
       return;
@@ -1418,7 +1419,7 @@ export default function AdminDashboard({
     } catch (error) {
       console.error("Error saving user:", error);
       alert(
-        `Failed to ${editingUser ? "update" : "create"} user. Please try again.`,
+        `Failed to ${editingUser ? "update" : "create"} user. Please try again.`
       );
     } finally {
       setLoading(false);
@@ -1499,13 +1500,14 @@ export default function AdminDashboard({
           onValueChange={setActiveTab}
           className="space-y-6"
         >
-          <TabsList className="grid w-full grid-cols-9 max-w-6xl">
+          <TabsList className="grid w-full grid-cols-10 max-w-6xl">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="users">Users</TabsTrigger>
             <TabsTrigger value="performance">Performance</TabsTrigger>
             <TabsTrigger value="spark-points">Spark Points</TabsTrigger>
             <TabsTrigger value="learning">Learning</TabsTrigger>
             <TabsTrigger value="news">News</TabsTrigger>
+            <TabsTrigger value="quick-access">Quick Access</TabsTrigger>
             <TabsTrigger value="system">System</TabsTrigger>
             <TabsTrigger value="pit">PIT System</TabsTrigger>
             <TabsTrigger value="settings">Settings</TabsTrigger>
@@ -2280,7 +2282,7 @@ export default function AdminDashboard({
                       name: "Jimmy Hendrix",
                       points: 3890,
                       avatar:
-                        "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=40&h=40&fit=crop&crop=face",
+                        "https://images.unsplash.com/photo-1507003211033-6461ffad8d80?w=40&h=40&fit=crop&crop=face",
                       rank: 2,
                     },
                     {
@@ -2619,6 +2621,11 @@ export default function AdminDashboard({
               featuredVideoUrl={featuredVideoUrl}
               setFeaturedVideoUrl={setFeaturedVideoUrl}
             />
+          </TabsContent>
+
+          {/* Quick Access Tab */}
+          <TabsContent value="quick-access" className="space-y-6">
+            <AdminQuickAccessManager />
           </TabsContent>
 
           {/* Settings Tab */}

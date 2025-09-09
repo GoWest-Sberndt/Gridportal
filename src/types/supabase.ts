@@ -377,6 +377,51 @@ export type Database = {
         }
         Relationships: []
       }
+      quick_access_tools: {
+        Row: {
+          background_color: string | null
+          created_at: string | null
+          created_by: string | null
+          icon: string | null
+          icon_type: string | null
+          id: string
+          image_url: string | null
+          is_editable: boolean | null
+          is_global: boolean | null
+          name: string
+          updated_at: string | null
+          url: string
+        }
+        Insert: {
+          background_color?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          icon?: string | null
+          icon_type?: string | null
+          id?: string
+          image_url?: string | null
+          is_editable?: boolean | null
+          is_global?: boolean | null
+          name: string
+          updated_at?: string | null
+          url: string
+        }
+        Update: {
+          background_color?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          icon?: string | null
+          icon_type?: string | null
+          id?: string
+          image_url?: string | null
+          is_editable?: boolean | null
+          is_global?: boolean | null
+          name?: string
+          updated_at?: string | null
+          url?: string
+        }
+        Relationships: []
+      }
       system_settings: {
         Row: {
           created_at: string | null
