@@ -674,66 +674,94 @@ export default function DashboardContent({
           <div className="relative h-40 bg-gradient-to-br from-gray-100 to-gray-200 rounded-xl shadow-lg overflow-hidden">
             {activeAds.length > 0 ? (
               <div className="relative h-full">
+                {/* Background Image */}
                 <img
-                  src={activeAds[currentAdIndex]?.url}
+                  src={activeAds[currentAdIndex]?.background_image || activeAds[currentAdIndex]?.url}
                   alt={activeAds[currentAdIndex]?.name}
-                  className="w-full h-full object-cover cursor-pointer transition-opacity duration-500"
-                  onClick={() => {
-                    if (activeAds[currentAdIndex]?.target_url) {
-                      window.open(
-                        activeAds[currentAdIndex].target_url,
-                        "_blank",
-                      );
-                    }
-                  }}
+                  className="w-full h-full object-cover"
                   onError={(e) => {
-                    // Fallback to placeholder if image fails to load
+                    // Fallback to gradient background if image fails to load
                     e.target.style.display = "none";
-                    e.target.nextSibling.style.display = "flex";
+                    e.target.parentElement.classList.add("bg-gradient-to-br", "from-blue-500", "to-purple-600");
                   }}
                 />
-                {/* Fallback placeholder */}
-                <div
-                  className="absolute inset-0 items-center justify-center bg-gradient-to-br from-gray-100 to-gray-200"
-                  style={{ display: "none" }}
-                >
-                  <div className="text-center">
-                    <div className="w-16 h-16 bg-gray-300 rounded-full mx-auto mb-4 flex items-center justify-center">
-                      <span className="text-gray-500 text-2xl">📢</span>
-                    </div>
-                    <h2 className="text-gray-600 text-xl font-bold mb-2">
-                      {activeAds[currentAdIndex]?.name || "Advertisement"}
-                    </h2>
-                    <p className="text-gray-500 text-sm">
-                      {activeAds[currentAdIndex]?.description ||
-                        "Partner advertisement"}
-                    </p>
-                  </div>
-                </div>
-                {/* Ad overlay info */}
-                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-4">
-                  <h3 className="text-white font-bold text-lg mb-1">
-                    {activeAds[currentAdIndex]?.name}
-                  </h3>
-                  {activeAds[currentAdIndex]?.description && (
-                    <p className="text-white/90 text-sm">
-                      {activeAds[currentAdIndex].description}
-                    </p>
-                  )}
-                </div>
-                {/* Ad rotation indicators */}
-                {activeAds.length > 1 && (
-                  <div className="absolute top-4 right-4 flex gap-1">
-                    {activeAds.map((_, index) => (
-                      <div
-                        key={index}
-                        className={`w-2 h-2 rounded-full transition-colors ${
-                          index === currentAdIndex ? "bg-white" : "bg-white/50"
-                        }`}
+
+                {/* Company Logo Overlay - Top Right */}
+                <div className="absolute top-4 right-4">
+                  <div className="w-12 h-12 bg-white rounded-lg shadow-lg flex items-center justify-center overflow-hidden">
+                    {activeAds[currentAdIndex]?.company_logo ? (
+                      <img
+                        src={activeAds[currentAdIndex].company_logo}
+                        alt={`${activeAds[currentAdIndex]?.company_name || 'Company'} logo`}
+                        className="w-10 h-10 object-contain"
+                        onError={(e) => {
+                          // Fallback to company initial if logo fails
+                          e.target.style.display = "none";
+                          e.target.nextSibling.style.display = "flex";
+                        }}
                       />
-                    ))}
+                    ) : null}
+                    <div 
+                      className="w-10 h-10 bg-gray-200 rounded flex items-center justify-center text-gray-600 font-bold text-sm"
+                      style={{ display: activeAds[currentAdIndex]?.company_logo ? "none" : "flex" }}
+                    >
+                      {(activeAds[currentAdIndex]?.company_name || activeAds[currentAdIndex]?.name || "A").charAt(0).toUpperCase()}
+                    </div>
                   </div>
-                )}
+                </div>
+
+                {/* Headline - Top Left */}
+                <div className="absolute left-6 top-4">
+                  <h2 className="text-white font-bold text-2xl leading-tight drop-shadow-lg">
+                    {activeAds[currentAdIndex]?.headline || activeAds[currentAdIndex]?.name}
+                  </h2>
+                </div>
+
+                {/* Bottom Content */}
+                <div className="absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-black/70 to-transparent">
+                  <div className="flex items-end justify-between">
+                    {/* Subheading - Bottom Left */}
+                    <div className="flex-1 mr-4">
+                      {activeAds[currentAdIndex]?.subheading && (
+                        <p className="text-white/90 text-sm leading-relaxed">
+                          {activeAds[currentAdIndex].subheading}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* CTA Button - Bottom Right */}
+                    <div className="flex items-center gap-4">
+                      {/* Ad rotation indicators */}
+                      {activeAds.length > 1 && (
+                        <div className="flex gap-1">
+                          {activeAds.map((_, index) => (
+                            <div
+                              key={index}
+                              className={`w-2 h-2 rounded-full transition-colors ${
+                                index === currentAdIndex ? "bg-white" : "bg-white/50"
+                              }`}
+                            />
+                          ))}
+                        </div>
+                      )}
+                      
+                      <button
+                        onClick={() => {
+                          if (activeAds[currentAdIndex]?.target_url) {
+                            window.open(
+                              activeAds[currentAdIndex].target_url,
+                              "_blank"
+                            );
+                          }
+                        }}
+                        className="bg-white text-gray-900 px-6 py-2 rounded-lg font-semibold text-sm hover:bg-gray-100 transition-colors shadow-lg flex items-center gap-2"
+                      >
+                        {activeAds[currentAdIndex]?.cta_text || "Learn More"}
+                        <ExternalLink size={14} />
+                      </button>
+                    </div>
+                  </div>
+                </div>
               </div>
             ) : (
               <div className="absolute inset-0 flex items-center justify-center border-2 border-dashed border-gray-300">

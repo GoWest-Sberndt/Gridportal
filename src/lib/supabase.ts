@@ -175,165 +175,43 @@ export const supabaseHelpers = {
           id,
           title,
           content,
+          excerpt,
           category,
           type,
           status,
           priority,
           author,
+          author_avatar,
           tags,
           views,
           likes,
-          comments,
-          is_featured,
-          thumbnail,
-          estimated_read_time,
-          duration,
+          comments_count,
+          featured,
+          image_url,
+          video_url,
+          video_thumbnail,
+          video_duration,
+          read_time,
+          seo_title,
+          seo_description,
+          is_published,
           publish_date,
+          scheduled_date,
           created_at,
           updated_at
         `,
         )
-        .eq("status", "published")
+        .eq("is_published", true)
         .order("publish_date", { ascending: false });
 
       if (error) {
         console.error("Error fetching news with video data:", error);
-        // Return mock data as fallback
-        return [
-          {
-            id: "mock-news-1",
-            title: "Federal Reserve Announces New Interest Rate Policy Changes",
-            content:
-              "The Federal Reserve has announced significant changes to interest rate policies that will impact mortgage lending across the nation. These changes are expected to affect both borrowers and lenders in the coming months.",
-            category: "market-updates",
-            type: "article",
-            status: "published",
-            priority: "high",
-            author: "Sarah Johnson",
-            tags: ["Federal Reserve", "Interest Rates", "Policy"],
-            views: 1250,
-            likes: 89,
-            comments: 23,
-            is_featured: true,
-            thumbnail: null,
-            main_image_url:
-              "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=400&h=200&fit=crop",
-            cta_text: null,
-            cta_url: null,
-            estimated_read_time: "5 min read",
-            duration: null,
-            publish_date: new Date().toISOString(),
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-            videoId: null,
-            videoUrl: null,
-            thumbnailUrl:
-              "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=400&h=200&fit=crop",
-            isVideo: false,
-            hasValidVideo: false,
-          },
-          {
-            id: "mock-news-2",
-            title: "Weekly Market Analysis: What Loan Officers Need to Know",
-            content: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
-            category: "educational",
-            type: "video",
-            status: "published",
-            priority: "medium",
-            author: "Michael Chen",
-            tags: ["Market Analysis", "Education", "Weekly Update"],
-            views: 2100,
-            likes: 156,
-            comments: 34,
-            is_featured: false,
-            thumbnail:
-              "https://img.youtube.com/vi/dQw4w9WgXcQ/maxresdefault.jpg",
-            main_image_url: null,
-            cta_text: null,
-            cta_url: null,
-            estimated_read_time: null,
-            duration: "12:45",
-            publish_date: new Date(Date.now() - 86400000).toISOString(),
-            created_at: new Date(Date.now() - 86400000).toISOString(),
-            updated_at: new Date(Date.now() - 86400000).toISOString(),
-            videoId: "dQw4w9WgXcQ",
-            videoUrl: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
-            thumbnailUrl:
-              "https://img.youtube.com/vi/dQw4w9WgXcQ/maxresdefault.jpg",
-            isVideo: true,
-            hasValidVideo: true,
-          },
-        ];
+        return [];
       }
 
       if (!data || data.length === 0) {
-        console.warn("No news data found, returning mock data");
-        // Return mock data when no data found
-        return [
-          {
-            id: "mock-news-1",
-            title: "Federal Reserve Announces New Interest Rate Policy Changes",
-            content:
-              "The Federal Reserve has announced significant changes to interest rate policies that will impact mortgage lending across the nation. These changes are expected to affect both borrowers and lenders in the coming months.",
-            category: "market-updates",
-            type: "article",
-            status: "published",
-            priority: "high",
-            author: "Sarah Johnson",
-            tags: ["Federal Reserve", "Interest Rates", "Policy"],
-            views: 1250,
-            likes: 89,
-            comments: 23,
-            is_featured: true,
-            thumbnail: null,
-            main_image_url:
-              "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=400&h=200&fit=crop",
-            cta_text: null,
-            cta_url: null,
-            estimated_read_time: "5 min read",
-            duration: null,
-            publish_date: new Date().toISOString(),
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-            videoId: null,
-            videoUrl: null,
-            thumbnailUrl:
-              "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=400&h=200&fit=crop",
-            isVideo: false,
-            hasValidVideo: false,
-          },
-          {
-            id: "mock-news-2",
-            title: "Weekly Market Analysis: What Loan Officers Need to Know",
-            content: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
-            category: "educational",
-            type: "video",
-            status: "published",
-            priority: "medium",
-            author: "Michael Chen",
-            tags: ["Market Analysis", "Education", "Weekly Update"],
-            views: 2100,
-            likes: 156,
-            comments: 34,
-            is_featured: false,
-            thumbnail:
-              "https://img.youtube.com/vi/dQw4w9WgXcQ/maxresdefault.jpg",
-            main_image_url: null,
-            cta_text: null,
-            cta_url: null,
-            estimated_read_time: null,
-            duration: "12:45",
-            publish_date: new Date(Date.now() - 86400000).toISOString(),
-            created_at: new Date(Date.now() - 86400000).toISOString(),
-            updated_at: new Date(Date.now() - 86400000).toISOString(),
-            videoId: "dQw4w9WgXcQ",
-            videoUrl: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
-            thumbnailUrl:
-              "https://img.youtube.com/vi/dQw4w9WgXcQ/maxresdefault.jpg",
-            isVideo: true,
-            hasValidVideo: true,
-          },
-        ];
+        console.warn("No news data found");
+        return [];
       }
 
       // Transform data to include video-specific information
@@ -342,15 +220,15 @@ export const supabaseHelpers = {
         let videoId = null;
         let videoUrl = null;
 
-        if (isVideo && item.content) {
-          // Extract YouTube video ID and URL from content (handles both URLs and embed codes)
-          let youtubeMatch = item.content.match(
+        if (isVideo && item.video_url) {
+          // Extract YouTube video ID and URL from video_url field
+          let youtubeMatch = item.video_url.match(
             /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/,
           );
 
           // If no direct URL match, try to extract from embed code
           if (!youtubeMatch) {
-            youtubeMatch = item.content.match(
+            youtubeMatch = item.video_url.match(
               /(?:https?:\/\/)?(?:www\.)?youtube\.com\/embed\/([a-zA-Z0-9_-]{11})/,
             );
           }
@@ -358,89 +236,28 @@ export const supabaseHelpers = {
           if (youtubeMatch) {
             videoId = youtubeMatch[1];
             videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
+          } else {
+            videoUrl = item.video_url;
           }
         }
 
         return {
           ...item,
           videoId,
-          videoUrl,
+          videoUrl: videoUrl || item.video_url,
           thumbnailUrl:
-            item.thumbnail ||
+            item.image_url || 
+            item.video_thumbnail ||
             (videoId
               ? `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`
               : null),
           isVideo,
-          hasValidVideo: isVideo && videoId !== null,
+          hasValidVideo: isVideo && (videoId !== null || (item.video_url && item.video_url.startsWith("http"))),
         };
       });
     } catch (error) {
       console.error("Error in getNewsWithVideoData:", error);
-      // Return mock data as fallback
-      return [
-        {
-          id: "mock-news-1",
-          title: "Federal Reserve Announces New Interest Rate Policy Changes",
-          content:
-            "The Federal Reserve has announced significant changes to interest rate policies that will impact mortgage lending across the nation. These changes are expected to affect both borrowers and lenders in the coming months.",
-          category: "market-updates",
-          type: "article",
-          status: "published",
-          priority: "high",
-          author: "Sarah Johnson",
-          tags: ["Federal Reserve", "Interest Rates", "Policy"],
-          views: 1250,
-          likes: 89,
-          comments: 23,
-          is_featured: true,
-          thumbnail: null,
-          main_image_url:
-            "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=400&h=200&fit=crop",
-          cta_text: null,
-          cta_url: null,
-          estimated_read_time: "5 min read",
-          duration: null,
-          publish_date: new Date().toISOString(),
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          videoId: null,
-          videoUrl: null,
-          thumbnailUrl:
-            "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=400&h=200&fit=crop",
-          isVideo: false,
-          hasValidVideo: false,
-        },
-        {
-          id: "mock-news-2",
-          title: "Weekly Market Analysis: What Loan Officers Need to Know",
-          content: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
-          category: "educational",
-          type: "video",
-          status: "published",
-          priority: "medium",
-          author: "Michael Chen",
-          tags: ["Market Analysis", "Education", "Weekly Update"],
-          views: 2100,
-          likes: 156,
-          comments: 34,
-          is_featured: false,
-          thumbnail: "https://img.youtube.com/vi/dQw4w9WgXcQ/maxresdefault.jpg",
-          main_image_url: null,
-          cta_text: null,
-          cta_url: null,
-          estimated_read_time: null,
-          duration: "12:45",
-          publish_date: new Date(Date.now() - 86400000).toISOString(),
-          created_at: new Date(Date.now() - 86400000).toISOString(),
-          updated_at: new Date(Date.now() - 86400000).toISOString(),
-          videoId: "dQw4w9WgXcQ",
-          videoUrl: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
-          thumbnailUrl:
-            "https://img.youtube.com/vi/dQw4w9WgXcQ/maxresdefault.jpg",
-          isVideo: true,
-          hasValidVideo: true,
-        },
-      ];
+      return [];
     }
   },
 
@@ -454,84 +271,36 @@ export const supabaseHelpers = {
           id,
           title,
           content,
+          excerpt,
           category,
           type,
           author,
+          author_avatar,
           tags,
           views,
           likes,
-          comments,
-          thumbnail,
-          estimated_read_time,
-          duration,
+          comments_count,
+          image_url,
+          video_url,
+          video_thumbnail,
+          video_duration,
+          read_time,
           publish_date,
           created_at
         `,
         )
-        .eq("is_featured", true)
-        .eq("status", "published")
+        .eq("featured", true)
+        .eq("is_published", true)
         .order("publish_date", { ascending: false });
 
       if (error) {
         console.error("Featured news query failed:", error);
-        // Return mock data as fallback
-        return [
-          {
-            id: "mock-1",
-            title: "Welcome to Safire Dashboard",
-            content:
-              "Stay updated with the latest mortgage industry news and market data. This is a sample news article to demonstrate the news functionality.",
-            category: "company-updates",
-            type: "article",
-            author: "Safire Team",
-            tags: ["Welcome", "Dashboard"],
-            views: 150,
-            likes: 12,
-            comments: 3,
-            thumbnail: null,
-            main_image_url:
-              "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=400&h=200&fit=crop",
-            publish_date: new Date().toISOString(),
-            created_at: new Date().toISOString(),
-            videoId: null,
-            videoUrl: null,
-            thumbnailUrl:
-              "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=400&h=200&fit=crop",
-            isVideo: false,
-            hasValidVideo: false,
-          },
-        ];
+        return [];
       }
 
       if (!data || data.length === 0) {
-        console.warn("No featured news found in database, returning mock data");
-        // Return mock data when no data found
-        return [
-          {
-            id: "mock-1",
-            title: "Welcome to Safire Dashboard",
-            content:
-              "Stay updated with the latest mortgage industry news and market data. This is a sample news article to demonstrate the news functionality.",
-            category: "company-updates",
-            type: "article",
-            author: "Safire Team",
-            tags: ["Welcome", "Dashboard"],
-            views: 150,
-            likes: 12,
-            comments: 3,
-            thumbnail: null,
-            main_image_url:
-              "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=400&h=200&fit=crop",
-            publish_date: new Date().toISOString(),
-            created_at: new Date().toISOString(),
-            videoId: null,
-            videoUrl: null,
-            thumbnailUrl:
-              "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=400&h=200&fit=crop",
-            isVideo: false,
-            hasValidVideo: false,
-          },
-        ];
+        console.warn("No featured news found in database");
+        return [];
       }
 
       console.log("Featured news data from database:", data);
@@ -542,58 +311,35 @@ export const supabaseHelpers = {
         let videoId = null;
         let videoUrl = null;
 
-        if (isVideo && item.content) {
-          const youtubeMatch = item.content.match(
+        if (isVideo && item.video_url) {
+          const youtubeMatch = item.video_url.match(
             /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/,
           );
           if (youtubeMatch) {
             videoId = youtubeMatch[1];
             videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
+          } else {
+            videoUrl = item.video_url;
           }
         }
 
         return {
           ...item,
           videoId,
-          videoUrl,
+          videoUrl: videoUrl || item.video_url,
           thumbnailUrl:
-            item.thumbnail ||
+            item.image_url ||
+            item.video_thumbnail ||
             (videoId
               ? `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`
               : null),
           isVideo,
-          hasValidVideo: isVideo && videoId !== null,
+          hasValidVideo: isVideo && (videoId !== null || (item.video_url && item.video_url.startsWith("http"))),
         };
       });
     } catch (error) {
       console.error("Featured news fetch failed:", error);
-      // Return mock data as fallback
-      return [
-        {
-          id: "mock-1",
-          title: "Welcome to Safire Dashboard",
-          content:
-            "Stay updated with the latest mortgage industry news and market data. This is a sample news article to demonstrate the news functionality.",
-          category: "company-updates",
-          type: "article",
-          author: "Safire Team",
-          tags: ["Welcome", "Dashboard"],
-          views: 150,
-          likes: 12,
-          comments: 3,
-          thumbnail: null,
-          main_image_url:
-            "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=400&h=200&fit=crop",
-          publish_date: new Date().toISOString(),
-          created_at: new Date().toISOString(),
-          videoId: null,
-          videoUrl: null,
-          thumbnailUrl:
-            "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=400&h=200&fit=crop",
-          isVideo: false,
-          hasValidVideo: false,
-        },
-      ];
+      return [];
     }
   },
 
@@ -658,7 +404,8 @@ export const supabaseHelpers = {
       .from("ads")
       .select("*")
       .eq("status", "active")
-      .order("upload_date", { ascending: false });
+      .order("priority", { ascending: true })
+      .order("created_at", { ascending: false });
 
     if (error) throw error;
     return data;
@@ -668,10 +415,293 @@ export const supabaseHelpers = {
     const { data, error } = await supabase
       .from("ads")
       .select("*")
-      .order("upload_date", { ascending: false });
+      .order("created_at", { ascending: false });
 
     if (error) throw error;
     return data;
+  },
+
+  async createAd(adData: {
+    name: string;
+    description?: string;
+    company_name?: string;
+    company_logo?: string;
+    image_url?: string;
+    background_image?: string;
+    headline?: string;
+    subheading?: string;
+    cta_text?: string;
+    target_url?: string;
+    category?: string;
+    status?: string;
+    priority?: number;
+    start_date?: string;
+    end_date?: string;
+    tags?: string[];
+    notes?: string;
+    created_by?: string;
+    company_logo_file_name?: string;
+    background_image_file_name?: string;
+    image_url_file_name?: string;
+  }) {
+    const { data, error } = await supabase
+      .from("ads")
+      .insert({
+        name: adData.name,
+        description: adData.description || null,
+        company_name: adData.company_name || null,
+        company_logo: adData.company_logo || null,
+        image_url: adData.image_url || null,
+        background_image: adData.background_image || null,
+        headline: adData.headline || null,
+        subheading: adData.subheading || null,
+        cta_text: adData.cta_text || 'Learn More',
+        target_url: adData.target_url || null,
+        category: adData.category || null,
+        status: adData.status || 'draft',
+        priority: adData.priority || 1,
+        start_date: adData.start_date || null,
+        end_date: adData.end_date || null,
+        tags: adData.tags || [],
+        notes: adData.notes || null,
+        created_by: adData.created_by || null,
+        company_logo_file_name: adData.company_logo_file_name || null,
+        background_image_file_name: adData.background_image_file_name || null,
+        image_url_file_name: adData.image_url_file_name || null,
+        clicks: 0,
+        impressions: 0,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  },
+
+  async updateAd(adId: string, adData: {
+    name?: string;
+    description?: string;
+    company_name?: string;
+    company_logo?: string;
+    image_url?: string;
+    background_image?: string;
+    headline?: string;
+    subheading?: string;
+    cta_text?: string;
+    target_url?: string;
+    category?: string;
+    status?: string;
+    priority?: number;
+    start_date?: string;
+    end_date?: string;
+    tags?: string[];
+    notes?: string;
+    updated_by?: string;
+    company_logo_file_name?: string;
+    background_image_file_name?: string;
+    image_url_file_name?: string;
+  }) {
+    const { data, error } = await supabase
+      .from("ads")
+      .update({
+        ...adData,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", adId)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  },
+
+  async deleteAd(adId: string) {
+    const { error } = await supabase.from("ads").delete().eq("id", adId);
+
+    if (error) throw error;
+    return true;
+  },
+
+  async updateAdStatus(adId: string, status: string, updatedBy?: string) {
+    const { data, error } = await supabase
+      .from("ads")
+      .update({
+        status,
+        updated_at: new Date().toISOString(),
+        updated_by: updatedBy || null,
+      })
+      .eq("id", adId)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  },
+
+  async incrementAdClicks(adId: string) {
+    // Try to use RPC function first, fallback to manual increment
+    try {
+      const { data, error } = await supabase.rpc('increment_ad_clicks', {
+        ad_id: adId
+      });
+
+      if (error) throw error;
+      return data;
+    } catch (rpcError) {
+      // Fallback to manual increment
+      const { data: currentAd, error: fetchError } = await supabase
+        .from("ads")
+        .select("clicks")
+        .eq("id", adId)
+        .single();
+
+      if (fetchError) throw fetchError;
+
+      const { data: updatedAd, error: updateError } = await supabase
+        .from("ads")
+        .update({
+          clicks: (currentAd.clicks || 0) + 1,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", adId)
+        .select()
+        .single();
+
+      if (updateError) throw updateError;
+      return updatedAd;
+    }
+  },
+
+  async incrementAdImpressions(adId: string) {
+    const { data, error } = await supabase.rpc('increment_ad_impressions', {
+      ad_id: adId
+    });
+
+    if (error) {
+      // Fallback to manual increment if RPC doesn't exist
+      const { data: currentAd, error: fetchError } = await supabase
+        .from("ads")
+        .select("impressions")
+        .eq("id", adId)
+        .single();
+
+      if (fetchError) throw fetchError;
+
+      const { data: updatedAd, error: updateError } = await supabase
+        .from("ads")
+        .update({
+          impressions: (currentAd.impressions || 0) + 1,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", adId)
+        .select()
+        .single();
+
+      if (updateError) throw updateError;
+      return updatedAd;
+    }
+
+    return data;
+  },
+
+  async getAdsByCategory(category: string) {
+    const { data, error } = await supabase
+      .from("ads")
+      .select("*")
+      .eq("category", category)
+      .eq("status", "active")
+      .order("priority", { ascending: true })
+      .order("created_at", { ascending: false });
+
+    if (error) throw error;
+    return data;
+  },
+
+  async getAdsByStatus(status: string) {
+    const { data, error } = await supabase
+      .from("ads")
+      .select("*")
+      .eq("status", status)
+      .order("priority", { ascending: true })
+      .order("created_at", { ascending: false });
+
+    if (error) throw error;
+    return data;
+  },
+
+  async getAdsStats() {
+    try {
+      const { data, error } = await supabase
+        .from("ads")
+        .select("status, clicks");
+
+      if (error) throw error;
+
+      const stats = {
+        total: data.length,
+        active: data.filter(ad => ad.status === 'active').length,
+        inactive: data.filter(ad => ad.status === 'inactive').length,
+        scheduled: data.filter(ad => ad.status === 'scheduled').length,
+        expired: data.filter(ad => ad.status === 'expired').length,
+        draft: data.filter(ad => ad.status === 'draft').length,
+        totalClicks: data.reduce((sum, ad) => sum + (ad.clicks || 0), 0),
+      };
+
+      return stats;
+    } catch (error) {
+      console.error("Error fetching ads stats:", error);
+      return {
+        total: 0,
+        active: 0,
+        inactive: 0,
+        scheduled: 0,
+        expired: 0,
+        draft: 0,
+        totalClicks: 0,
+      };
+    }
+  },
+
+  // Ad Image Upload to Supabase Storage
+  async uploadAdImage(file: File, fileName: string): Promise<string> {
+    try {
+      // Upload file to Supabase storage
+      const { data, error } = await supabase.storage
+        .from("ad-images")
+        .upload(fileName, file, {
+          cacheControl: "3600",
+          upsert: true,
+        });
+
+      if (error) throw error;
+
+      // Get public URL
+      const { data: urlData } = supabase.storage
+        .from("ad-images")
+        .getPublicUrl(fileName);
+
+      return urlData.publicUrl;
+    } catch (error) {
+      console.error("Error uploading ad image:", error);
+      throw new Error("Failed to upload image. Please try again.");
+    }
+  },
+
+  // Delete ad image from storage
+  async deleteAdImage(fileName: string): Promise<boolean> {
+    try {
+      const { error } = await supabase.storage
+        .from("ad-images")
+        .remove([fileName]);
+
+      if (error) throw error;
+      return true;
+    } catch (error) {
+      console.error("Error deleting ad image:", error);
+      return false;
+    }
   },
 
   // Learning Content
@@ -1309,7 +1339,6 @@ export const supabaseHelpers = {
       }
 
       if (!data || data.length === 0) {
-        console.warn("getFeaturedVideoUrl: No featured videos found");
         return null;
       }
 
@@ -1352,89 +1381,69 @@ export const supabaseHelpers = {
   },
 
   async getFeaturedVideos(limit = 10) {
-    // Pull exactly the columns you showed in your screenshot
-    const { data, error } = await supabase
-      .from("news")
-      .select(
-        "id, title, content, category, type, status, priority, author, tags, views, likes, comments, is_featured, thumbnail, estimated_read_time, duration, publish_date",
-      )
-      .eq("is_featured", true)
-      // optional: uncomment if you gate by type/status
-      // .eq("type", "video")
-      // .eq("status", "published")
-      .order("publish_date", { ascending: false })
-      .limit(limit);
+    try {
+      const { data, error } = await supabase
+        .from("news")
+        .select(
+          `
+          id,
+          title,
+          content,
+          author,
+          video_url,
+          video_thumbnail,
+          video_duration,
+          views,
+          likes,
+          comments_count,
+          publish_date,
+          created_at
+        `,
+        )
+        .eq("type", "video")
+        .eq("featured", true)
+        .eq("is_published", true)
+        .order("publish_date", { ascending: false })
+        .limit(limit);
 
-    if (error) throw error;
-
-    // Helper functions to extract YouTube URLs and convert to embed format
-    const extractYouTubeEmbedUrl = (content) => {
-      if (!content || typeof content !== "string") return null;
-
-      // Check if it's already an embed URL
-      if (content.includes("youtube.com/embed/")) {
-        return content;
+      if (error) {
+        console.error("Error fetching featured videos:", error);
+        return [];
       }
 
-      // Extract video ID from various YouTube URL formats
-      const videoIdMatch = content.match(
-        /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/,
-      );
-
-      if (videoIdMatch && videoIdMatch[1]) {
-        return `https://www.youtube.com/embed/${videoIdMatch[1]}`;
+      if (!data || data.length === 0) {
+        return [];
       }
 
-      return null;
-    };
+      // Transform data to include video-specific information
+      return data.map((item) => {
+        let videoId = null;
+        let embedUrl = null;
 
-    const getYouTubeVideoId = (content) => {
-      if (!content || typeof content !== "string") return null;
-      try {
-        const regExp =
-          /^.*(?:youtu\.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]{11}).*/;
-        const match = content.match(regExp);
-        return match && match[1] && match[1].length === 11 ? match[1] : null;
-      } catch {
-        return null;
-      }
-    };
+        if (item.video_url) {
+          const youtubeMatch = item.video_url.match(
+            /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/,
+          );
+          if (youtubeMatch) {
+            videoId = youtubeMatch[1];
+            embedUrl = `https://www.youtube.com/embed/${videoId}`;
+          }
+        }
 
-    const getOptimalThumbnail = (row, videoId) => {
-      // Priority: 1. Custom uploaded thumbnail, 2. YouTube auto-generated thumbnail
-      if (row.thumbnail && row.thumbnail.trim()) {
-        return row.thumbnail;
-      }
-
-      if (videoId) {
-        // Use maxresdefault for better quality, fallback to hqdefault if not available
-        return `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
-      }
-
-      return null;
-    };
-
-    return (data || []).map((row) => {
-      const embedUrl = extractYouTubeEmbedUrl(row.content);
-      const videoId = getYouTubeVideoId(row.content);
-      const thumbnail = getOptimalThumbnail(row, videoId);
-
-      return {
-        // what your component expects:
-        title: row.title ?? "Featured Video",
-        channelTitle: row.author || "Safire Home Lending",
-        publishedAt: row.publish_date ?? null,
-        duration: row.duration ?? null, // stored as text in your schema
-        views: Number(row.views ?? 0),
-        embedUrl: embedUrl, // YouTube embed URL for iframe
-        content: row.content, // Raw content from database
-        thumbnail: thumbnail,
-        videoId, // derived from content URL
-        hasCustomThumbnail: !!(row.thumbnail && row.thumbnail.trim()),
-        // keep anything else you might want later:
-        _raw: row,
-      };
-    });
+        return {
+          ...item,
+          videoId,
+          embedUrl,
+          thumbnail: item.video_thumbnail || (videoId ? `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg` : null),
+          channelTitle: "Safire Home Lending",
+          publishedAt: item.publish_date || item.created_at,
+          duration: item.video_duration,
+        };
+      });
+    } catch (error) {
+      console.error("Error in getFeaturedVideos:", error);
+      return [];
+    }
   },
 
   async updateFeaturedVideoUrl(url: string) {

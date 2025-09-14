@@ -13,6 +13,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/toaster";
 import ErrorBoundary from "./components/ErrorBoundary";
 import SessionWarningDialog from "./components/SessionWarningDialog";
+import ElevenLabsWidget from "./components/ElevenLabsWidget";
 
 function App() {
   return (
@@ -110,6 +111,9 @@ function AppContent() {
 
       {/* Session Warning Dialog */}
       {showSessionWarning && <SessionWarningDialog />}
+
+      {/* ElevenLabs AI Chatbot Widget */}
+      <ElevenLabsWidget enabled={false} />
 
       <Toaster />
     </>

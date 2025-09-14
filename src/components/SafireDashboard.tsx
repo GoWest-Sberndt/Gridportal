@@ -296,50 +296,17 @@ export default function SafireDashboard() {
                   </h1>
                 </div>
                 <div className="flex items-center gap-3 flex-1">
-                  <div className="flex items-center bg-white rounded-full shadow-sm border border-gray-200 px-4 py-2 w-full max-w-md">
-                    <input
-                      type="text"
-                      placeholder=""
-                      className="bg-transparent border-none outline-none text-sm text-gray-700 placeholder-gray-600 flex-1"
-                    />
-                    <button className="ml-3 p-1 hover:bg-gray-300 rounded-full transition-colors">
-                      <SearchIcon size={16} className="text-gray-700" />
-                    </button>
-                  </div>
-                  <div className="flex items-center gap-2 ml-auto">
-                    <button
-                      onClick={() => window.open("https://email.gowestlending.com", "_blank")}
-                      className="w-10 h-10 bg-white hover:bg-gray-50 rounded-full flex items-center justify-center transition-colors shadow-sm overflow-hidden"
-                      title="Email"
-                    >
-                      <img
-                        src="/images/outlook-logo.png"
-                        alt="Outlook"
-                        className="w-[75%] h-[75%] object-cover"
+                  <div className="flex items-center justify-center w-full">
+                    <div className="flex items-center bg-white rounded-full shadow-sm border border-gray-200 px-4 py-2 w-full max-w-lg">
+                      <input
+                        type="text"
+                        placeholder=""
+                        className="bg-transparent border-none outline-none text-sm text-gray-700 placeholder-gray-600 flex-1"
                       />
-                    </button>
-                    <button
-                      onClick={() => window.open("https://app.advisoradvantage.app", "_blank")}
-                      className="w-10 h-10 bg-[#5DADE2] hover:bg-[#3498DB] rounded-full flex items-center justify-center transition-colors shadow-sm"
-                      title="Advisor Advantage"
-                    >
-                      <img
-                        src="/advisor-advantage-icon.png"
-                        alt="Advisor Advantage"
-                        className="w-10 h-10 rounded-full object-cover"
-                      />
-                    </button>
-                    <button
-                      onClick={() => window.open("https://ro.am/r/", "_blank")}
-                      className="w-10 h-10 bg-[#032F60] hover:bg-[#1a4a73] rounded-full flex items-center justify-center transition-colors shadow-sm overflow-hidden"
-                      title="Roam"
-                    >
-                      <img
-                        src="/roam-icon.png"
-                        alt="Roam"
-                        className="w-full h-full object-cover"
-                      />
-                    </button>
+                      <button className="ml-3 p-1 hover:bg-gray-300 rounded-full transition-colors">
+                        <SearchIcon size={16} className="text-gray-700" />
+                      </button>
+                    </div>
                   </div>
                   <button
                     onClick={() => setRightSidebarOpen(true)}

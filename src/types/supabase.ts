@@ -16,63 +16,117 @@ export type Database = {
     Tables: {
       ads: {
         Row: {
+          background_image: string | null
+          background_image_file_name: string | null
           category: string | null
           clicks: number | null
+          company_logo: string | null
+          company_logo_file_name: string | null
+          company_name: string | null
           created_at: string | null
+          created_by: string | null
           cta_text: string | null
           cta_url: string | null
           description: string | null
+          end_date: string | null
           headline: string | null
           id: string
+          image_url: string
+          image_url_file_name: string | null
           main_image_url: string | null
           name: string
+          notes: string | null
+          priority: number | null
+          start_date: string | null
           status: string | null
           sub_image_url: string | null
           subheading: string | null
+          tags: string[] | null
           target_url: string | null
           updated_at: string | null
+          updated_by: string | null
           upload_date: string | null
-          url: string
         }
         Insert: {
+          background_image?: string | null
+          background_image_file_name?: string | null
           category?: string | null
           clicks?: number | null
+          company_logo?: string | null
+          company_logo_file_name?: string | null
+          company_name?: string | null
           created_at?: string | null
+          created_by?: string | null
           cta_text?: string | null
           cta_url?: string | null
           description?: string | null
+          end_date?: string | null
           headline?: string | null
           id?: string
+          image_url: string
+          image_url_file_name?: string | null
           main_image_url?: string | null
           name: string
+          notes?: string | null
+          priority?: number | null
+          start_date?: string | null
           status?: string | null
           sub_image_url?: string | null
           subheading?: string | null
+          tags?: string[] | null
           target_url?: string | null
           updated_at?: string | null
+          updated_by?: string | null
           upload_date?: string | null
-          url: string
         }
         Update: {
+          background_image?: string | null
+          background_image_file_name?: string | null
           category?: string | null
           clicks?: number | null
+          company_logo?: string | null
+          company_logo_file_name?: string | null
+          company_name?: string | null
           created_at?: string | null
+          created_by?: string | null
           cta_text?: string | null
           cta_url?: string | null
           description?: string | null
+          end_date?: string | null
           headline?: string | null
           id?: string
+          image_url?: string
+          image_url_file_name?: string | null
           main_image_url?: string | null
           name?: string
+          notes?: string | null
+          priority?: number | null
+          start_date?: string | null
           status?: string | null
           sub_image_url?: string | null
           subheading?: string | null
+          tags?: string[] | null
           target_url?: string | null
           updated_at?: string | null
+          updated_by?: string | null
           upload_date?: string | null
-          url?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "ads_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ads_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       badges: {
         Row: {
@@ -314,65 +368,95 @@ export type Database = {
       news: {
         Row: {
           author: string
+          author_avatar: string | null
           category: string
-          comments: number | null
+          comments_count: number | null
           content: string
           created_at: string | null
           duration: string | null
-          estimated_read_time: string | null
+          excerpt: string | null
+          featured: boolean | null
           id: string
+          image_url: string | null
           is_featured: boolean | null
+          is_published: boolean | null
           likes: number | null
           priority: string | null
           publish_date: string | null
+          read_time: string | null
+          scheduled_date: string | null
+          seo_description: string | null
+          seo_title: string | null
           status: string | null
           tags: string[] | null
-          thumbnail: string | null
           title: string
           type: string
           updated_at: string | null
+          video_duration: string | null
+          video_thumbnail: string | null
+          video_url: string | null
           views: number | null
         }
         Insert: {
           author: string
+          author_avatar?: string | null
           category: string
-          comments?: number | null
+          comments_count?: number | null
           content: string
           created_at?: string | null
           duration?: string | null
-          estimated_read_time?: string | null
+          excerpt?: string | null
+          featured?: boolean | null
           id?: string
+          image_url?: string | null
           is_featured?: boolean | null
+          is_published?: boolean | null
           likes?: number | null
           priority?: string | null
           publish_date?: string | null
+          read_time?: string | null
+          scheduled_date?: string | null
+          seo_description?: string | null
+          seo_title?: string | null
           status?: string | null
           tags?: string[] | null
-          thumbnail?: string | null
           title: string
           type: string
           updated_at?: string | null
+          video_duration?: string | null
+          video_thumbnail?: string | null
+          video_url?: string | null
           views?: number | null
         }
         Update: {
           author?: string
+          author_avatar?: string | null
           category?: string
-          comments?: number | null
+          comments_count?: number | null
           content?: string
           created_at?: string | null
           duration?: string | null
-          estimated_read_time?: string | null
+          excerpt?: string | null
+          featured?: boolean | null
           id?: string
+          image_url?: string | null
           is_featured?: boolean | null
+          is_published?: boolean | null
           likes?: number | null
           priority?: string | null
           publish_date?: string | null
+          read_time?: string | null
+          scheduled_date?: string | null
+          seo_description?: string | null
+          seo_title?: string | null
           status?: string | null
           tags?: string[] | null
-          thumbnail?: string | null
           title?: string
           type?: string
           updated_at?: string | null
+          video_duration?: string | null
+          video_thumbnail?: string | null
+          video_url?: string | null
           views?: number | null
         }
         Relationships: []

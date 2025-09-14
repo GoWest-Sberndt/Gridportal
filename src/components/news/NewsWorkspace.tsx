@@ -39,6 +39,10 @@ import {
   ThumbsUp,
   Bookmark,
   Send,
+  Star,
+  Flame,
+  PlayCircle,
+  BookOpen,
 } from "lucide-react";
 
 interface NewsItem {
@@ -65,34 +69,12 @@ interface NewsItem {
   type: 'article' | 'video';
 }
 
-const categories = [
-  { id: 'all', label: 'All News', icon: Newspaper },
-  { id: 'market-updates', label: 'Market Updates', icon: TrendingUp },
-  { id: 'industry-news', label: 'Industry News', icon: Building },
-  { id: 'company-updates', label: 'Company Updates', icon: FileText },
-  { id: 'training', label: 'Training & Education', icon: Video },
-];
-
-const sortOptions = [
-  { value: 'newest', label: 'Newest First' },
-  { value: 'oldest', label: 'Oldest First' },
-  { value: 'most-viewed', label: 'Most Viewed' },
-  { value: 'most-liked', label: 'Most Liked' },
-  { value: 'featured', label: 'Featured First' },
-];
-
 export default function NewsWorkspace() {
   const { user } = useAuth();
   const [newsItems, setNewsItems] = useState<NewsItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState("all");
   const [selectedArticle, setSelectedArticle] = useState<NewsItem | null>(null);
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
-  const [sortBy, setSortBy] = useState('newest');
-  const [showFilters, setShowFilters] = useState(false);
-  const [selectedTags, setSelectedTags] = useState<string[]>([]);
-  const [availableTags, setAvailableTags] = useState<string[]>([]);
   const [showShareModal, setShowShareModal] = useState(false);
   const [shareItem, setShareItem] = useState<NewsItem | null>(null);
 
@@ -126,25 +108,23 @@ export default function NewsWorkspace() {
             comments_count: item.comments_count || 0,
             is_published: item.is_published !== false,
             type: item.video_url ? 'video' : 'article',
+            priority: item.priority || 'medium',
+            status: item.status || (item.is_published ? 'published' : 'draft'),
+            scheduled_date: item.scheduled_date,
+            seo_title: item.seo_title,
+            seo_description: item.seo_description,
+            read_time: item.read_time,
           }));
           
-          setNewsItems(formattedNews);
-          
-          // Extract unique tags
-          const tags = new Set<string>();
-          formattedNews.forEach(item => {
-            item.tags.forEach(tag => tags.add(tag));
-          });
-          setAvailableTags(Array.from(tags));
+          // Only show published content to users
+          const publishedNews = formattedNews.filter(item => item.is_published && item.status === 'published');
+          setNewsItems(publishedNews);
         } else {
-          // Set mock data if no data from database
-          setNewsItems(mockNewsData);
-          setAvailableTags(['mortgage rates', 'industry trends', 'company news', 'training', 'market analysis']);
+          setNewsItems([]);
         }
       } catch (error) {
         console.error('Error loading news:', error);
-        setNewsItems(mockNewsData);
-        setAvailableTags(['mortgage rates', 'industry trends', 'company news', 'training', 'market analysis']);
+        setNewsItems([]);
       } finally {
         setLoading(false);
       }
@@ -154,101 +134,53 @@ export default function NewsWorkspace() {
   }, []);
 
   // Mock data for demonstration
-  const mockNewsData: NewsItem[] = [
-    {
-      id: '1',
-      title: 'Federal Reserve Announces New Interest Rate Decision',
-      content: 'The Federal Reserve has announced its latest interest rate decision, impacting mortgage rates across the industry. This comprehensive analysis covers the implications for home buyers and the lending market...',
-      excerpt: 'The Federal Reserve has announced its latest interest rate decision, impacting mortgage rates across the industry...',
-      author: 'Sarah Johnson',
-      author_avatar: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=100&h=100&fit=crop&crop=face',
-      publish_date: new Date().toISOString(),
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      category: 'market-updates',
-      tags: ['mortgage rates', 'federal reserve', 'market analysis'],
-      featured: true,
-      image_url: 'https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=800&q=80',
-      views: 1250,
-      likes: 89,
-      comments_count: 23,
-      is_published: true,
-      type: 'article',
-    },
-    {
-      id: '2',
-      title: 'New Loan Processing System Training',
-      content: 'Learn about our new loan processing system in this comprehensive training video. Discover improved workflows, enhanced security features, and streamlined approval processes...',
-      excerpt: 'Learn about our new loan processing system in this comprehensive training video...',
-      author: 'Mike Chen',
-      author_avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop&crop=face',
-      publish_date: new Date(Date.now() - 86400000).toISOString(),
-      created_at: new Date(Date.now() - 86400000).toISOString(),
-      updated_at: new Date(Date.now() - 86400000).toISOString(),
-      category: 'training',
-      tags: ['training', 'loan processing', 'system update'],
-      featured: false,
-      video_url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
-      video_thumbnail: 'https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=800&q=80',
-      video_duration: '12:34',
-      views: 892,
-      likes: 67,
-      comments_count: 15,
-      is_published: true,
-      type: 'video',
-    },
-    {
-      id: '3',
-      title: 'Q4 Company Performance and 2024 Outlook',
-      content: 'Our Q4 performance exceeded expectations with record loan volumes and customer satisfaction scores. Looking ahead to 2024, we are excited to announce new initiatives...',
-      excerpt: 'Our Q4 performance exceeded expectations with record loan volumes and customer satisfaction scores...',
-      author: 'Jennifer Davis',
-      author_avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100&h=100&fit=crop&crop=face',
-      publish_date: new Date(Date.now() - 172800000).toISOString(),
-      created_at: new Date(Date.now() - 172800000).toISOString(),
-      updated_at: new Date(Date.now() - 172800000).toISOString(),
-      category: 'company-updates',
-      tags: ['company news', 'performance', 'outlook'],
-      featured: true,
-      image_url: 'https://images.unsplash.com/photo-1554224155-6726b3ff858f?w=800&q=80',
-      views: 2100,
-      likes: 156,
-      comments_count: 42,
-      is_published: true,
-      type: 'article',
-    },
-  ];
+  const mockNewsData: NewsItem[] = [];
 
-  // Filter and sort news items
-  const filteredNews = newsItems
-    .filter(item => {
-      if (!item.is_published) return false;
-      if (selectedCategory !== 'all' && item.category !== selectedCategory) return false;
-      if (searchTerm && !item.title.toLowerCase().includes(searchTerm.toLowerCase()) && 
-          !item.content.toLowerCase().includes(searchTerm.toLowerCase())) return false;
-      if (selectedTags.length > 0 && !selectedTags.some(tag => item.tags.includes(tag))) return false;
-      return true;
-    })
+  // Filter data for each section
+  const recentAndHighlights = newsItems
+    .filter(item => item.featured || new Date(item.publish_date) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000))
     .sort((a, b) => {
-      switch (sortBy) {
-        case 'oldest':
-          return new Date(a.publish_date).getTime() - new Date(b.publish_date).getTime();
-        case 'most-viewed':
-          return b.views - a.views;
-        case 'most-liked':
-          return b.likes - a.likes;
-        case 'featured':
-          if (a.featured && !b.featured) return -1;
-          if (!a.featured && b.featured) return 1;
-          return new Date(b.publish_date).getTime() - new Date(a.publish_date).getTime();
-        default: // newest
-          return new Date(b.publish_date).getTime() - new Date(a.publish_date).getTime();
-      }
+      if (a.featured && !b.featured) return -1;
+      if (!a.featured && b.featured) return 1;
+      return new Date(b.publish_date).getTime() - new Date(a.publish_date).getTime();
     });
+
+  const videoContent = newsItems
+    .filter(item => item.type === 'video')
+    .sort((a, b) => new Date(b.publish_date).getTime() - new Date(a.publish_date).getTime());
+
+  const articleContent = newsItems
+    .filter(item => item.type === 'article')
+    .sort((a, b) => new Date(b.publish_date).getTime() - new Date(a.publish_date).getTime());
+
+  // Apply search filter if search term exists
+  const filteredRecentAndHighlights = searchTerm 
+    ? recentAndHighlights.filter(item => 
+        item.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        item.content.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        item.tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()))
+      )
+    : recentAndHighlights;
+
+  const filteredVideoContent = searchTerm
+    ? videoContent.filter(item => 
+        item.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        item.content.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        item.tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()))
+      )
+    : videoContent;
+
+  const filteredArticleContent = searchTerm
+    ? articleContent.filter(item => 
+        item.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        item.content.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        item.tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()))
+      )
+    : articleContent;
 
   const handleShare = (item: NewsItem, platform?: string) => {
     const url = `${window.location.origin}/news/${item.id}`;
-    const text = `Check out this article: ${item.title}`;
+    const text = `Check out this ${item.type}: ${item.title}`;
 
     switch (platform) {
       case 'facebook':
@@ -270,21 +202,9 @@ export default function NewsWorkspace() {
   };
 
   const handleLike = async (itemId: string) => {
-    // Update local state optimistically
     setNewsItems(prev => prev.map(item => 
       item.id === itemId ? { ...item, likes: item.likes + 1 } : item
     ));
-    
-    // TODO: Update in database
-    try {
-      await supabaseHelpers.likeNewsItem(itemId, user?.id);
-    } catch (error) {
-      console.error('Error liking item:', error);
-      // Revert on error
-      setNewsItems(prev => prev.map(item => 
-        item.id === itemId ? { ...item, likes: item.likes - 1 } : item
-      ));
-    }
   };
 
   const formatDate = (dateString: string) => {
@@ -298,142 +218,208 @@ export default function NewsWorkspace() {
     return date.toLocaleDateString();
   };
 
-  const NewsCard = ({ item, isGrid = true }: { item: NewsItem; isGrid?: boolean }) => (
+  // Hero Card Component for featured content
+  const HeroCard = ({ item }: { item: NewsItem }) => (
     <Card 
-      className={`cursor-pointer hover:shadow-lg transition-all duration-200 ${
-        isGrid ? 'h-full' : 'mb-4'
-      } ${item.featured ? 'ring-2 ring-blue-200' : ''}`}
+      className="relative overflow-hidden cursor-pointer hover:shadow-2xl transition-all duration-300 transform hover:scale-[1.02]"
       onClick={() => setSelectedArticle(item)}
     >
-      {item.featured && (
-        <div className="bg-gradient-to-r from-blue-500 to-purple-600 text-white px-3 py-1 text-xs font-bold">
-          FEATURED
-        </div>
-      )}
-      
-      <div className={`relative ${isGrid ? '' : 'flex'}`}>
-        {(item.image_url || item.video_thumbnail) && (
-          <div className={`relative ${isGrid ? 'w-full h-48' : 'w-48 h-32 flex-shrink-0'} overflow-hidden ${isGrid ? 'rounded-t-lg' : 'rounded-l-lg'}`}>
-            <img
-              src={item.image_url || item.video_thumbnail}
-              alt={item.title}
-              className="w-full h-full object-cover"
-            />
-            {item.type === 'video' && (
-              <div className="absolute inset-0 flex items-center justify-center bg-black/30">
-                <div className="w-12 h-12 bg-red-600 rounded-full flex items-center justify-center">
-                  <Play className="w-6 h-6 text-white ml-1" fill="white" />
-                </div>
-              </div>
-            )}
-            {item.video_duration && (
-              <div className="absolute bottom-2 right-2 bg-black/70 text-white px-2 py-1 rounded text-xs">
-                {item.video_duration}
-              </div>
-            )}
+      <div className="relative h-80 lg:h-96">
+        <img
+          src={item.image_url || item.video_thumbnail}
+          alt={item.title}
+          className="w-full h-full object-cover"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+        
+        {item.type === 'video' && (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="w-20 h-20 bg-red-600/90 rounded-full flex items-center justify-center backdrop-blur-sm">
+              <Play className="w-10 h-10 text-white ml-1" fill="white" />
+            </div>
           </div>
         )}
         
-        <CardContent className={`p-4 ${isGrid ? '' : 'flex-1'}`}>
-          <div className="flex items-center gap-2 mb-2">
-            <Badge variant="outline" className="text-xs">
-              {categories.find(cat => cat.id === item.category)?.label || item.category}
+        {item.featured && (
+          <div className="absolute top-4 left-4">
+            <Badge className="bg-gradient-to-r from-yellow-500 to-orange-500 text-white font-bold">
+              <Star className="w-3 h-3 mr-1" />
+              FEATURED
+            </Badge>
+          </div>
+        )}
+        
+        {item.video_duration && (
+          <div className="absolute bottom-4 right-4 bg-black/70 text-white px-3 py-1 rounded-full text-sm font-medium">
+            {item.video_duration}
+          </div>
+        )}
+        
+        <div className="absolute bottom-0 left-0 right-0 p-6">
+          <div className="flex items-center gap-2 mb-3">
+            <Badge variant="secondary" className="bg-white/20 text-white backdrop-blur-sm">
+              {item.category.replace('-', ' ').toUpperCase()}
             </Badge>
             {item.type === 'video' && (
-              <Badge variant="outline" className="text-xs flex items-center gap-1">
-                <Video className="w-3 h-3" />
-                Video
+              <Badge variant="secondary" className="bg-red-600/80 text-white backdrop-blur-sm">
+                <Video className="w-3 h-3 mr-1" />
+                VIDEO
               </Badge>
             )}
           </div>
           
-          <h3 className={`font-bold text-gray-900 mb-2 line-clamp-2 ${isGrid ? 'text-lg' : 'text-base'}`}>
+          <h2 className="text-2xl lg:text-3xl font-bold text-white mb-3 line-clamp-2">
             {item.title}
-          </h3>
+          </h2>
           
-          <p className="text-gray-600 text-sm mb-3 line-clamp-2">
+          <p className="text-gray-200 text-lg mb-4 line-clamp-2">
             {item.excerpt}
           </p>
           
-          <div className="flex items-center justify-between text-xs text-gray-500 mb-3">
-            <div className="flex items-center gap-2">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3 text-white/90">
               {item.author_avatar ? (
                 <img
                   src={item.author_avatar}
                   alt={item.author}
-                  className="w-6 h-6 rounded-full"
+                  className="w-8 h-8 rounded-full border-2 border-white/30"
                 />
               ) : (
-                <div className="w-6 h-6 bg-gray-300 rounded-full flex items-center justify-center">
-                  <User className="w-3 h-3" />
+                <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center">
+                  <User className="w-4 h-4" />
                 </div>
               )}
-              <span>{item.author}</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <Clock className="w-3 h-3" />
-              <span>{formatDate(item.publish_date)}</span>
-            </div>
-          </div>
-          
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4 text-xs text-gray-500">
-              <div className="flex items-center gap-1">
-                <Eye className="w-3 h-3" />
-                <span>{item.views.toLocaleString()}</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <Heart className="w-3 h-3" />
-                <span>{item.likes}</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <MessageCircle className="w-3 h-3" />
-                <span>{item.comments_count}</span>
+              <div>
+                <div className="font-medium">{item.author}</div>
+                <div className="text-sm text-white/70">{formatDate(item.publish_date)}</div>
               </div>
             </div>
             
-            <div className="flex items-center gap-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleLike(item.id);
-                }}
-                className="h-8 px-2"
-              >
-                <ThumbsUp className="w-3 h-3" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleShare(item);
-                }}
-                className="h-8 px-2"
-              >
-                <Share2 className="w-3 h-3" />
-              </Button>
+            <div className="flex items-center gap-4 text-white/90 text-sm">
+              <div className="flex items-center gap-1">
+                <Eye className="w-4 h-4" />
+                <span>{item.views.toLocaleString()}</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <Heart className="w-4 h-4" />
+                <span>{item.likes}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </Card>
+  );
+
+  // Large Thumbnail Card for videos and articles
+  const LargeThumbnailCard = ({ item }: { item: NewsItem }) => (
+    <Card 
+      className="overflow-hidden cursor-pointer hover:shadow-xl transition-all duration-300 transform hover:scale-[1.02] group"
+      onClick={() => setSelectedArticle(item)}
+    >
+      <div className="relative h-48 lg:h-56">
+        <img
+          src={item.image_url || item.video_thumbnail}
+          alt={item.title}
+          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+        
+        {item.type === 'video' && (
+          <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+            <div className="w-16 h-16 bg-red-600/90 rounded-full flex items-center justify-center backdrop-blur-sm">
+              <Play className="w-8 h-8 text-white ml-1" fill="white" />
+            </div>
+          </div>
+        )}
+        
+        {item.featured && (
+          <div className="absolute top-3 left-3">
+            <Badge className="bg-gradient-to-r from-yellow-500 to-orange-500 text-white font-bold">
+              <Flame className="w-3 h-3 mr-1" />
+              HOT
+            </Badge>
+          </div>
+        )}
+        
+        {item.video_duration && (
+          <div className="absolute bottom-3 right-3 bg-black/70 text-white px-2 py-1 rounded text-sm">
+            {item.video_duration}
+          </div>
+        )}
+        
+        <div className="absolute bottom-0 left-0 right-0 p-4">
+          <Badge variant="secondary" className="bg-white/20 text-white backdrop-blur-sm mb-2">
+            {item.type === 'video' ? 'VIDEO' : 'ARTICLE'}
+          </Badge>
+        </div>
+      </div>
+      
+      <CardContent className="p-4">
+        <h3 className="font-bold text-lg text-gray-900 mb-2 line-clamp-2 group-hover:text-blue-600 transition-colors">
+          {item.title}
+        </h3>
+        
+        <p className="text-gray-600 text-sm mb-3 line-clamp-2">
+          {item.excerpt}
+        </p>
+        
+        <div className="flex items-center justify-between text-xs text-gray-500 mb-3">
+          <div className="flex items-center gap-2">
+            {item.author_avatar ? (
+              <img
+                src={item.author_avatar}
+                alt={item.author}
+                className="w-6 h-6 rounded-full"
+              />
+            ) : (
+              <div className="w-6 h-6 bg-gray-300 rounded-full flex items-center justify-center">
+                <User className="w-3 h-3" />
+              </div>
+            )}
+            <span className="font-medium">{item.author}</span>
+          </div>
+          <span>{formatDate(item.publish_date)}</span>
+        </div>
+        
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3 text-xs text-gray-500">
+            <div className="flex items-center gap-1">
+              <Eye className="w-3 h-3" />
+              <span>{item.views.toLocaleString()}</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <Heart className="w-3 h-3" />
+              <span>{item.likes}</span>
             </div>
           </div>
           
-          {item.tags.length > 0 && (
-            <div className="flex flex-wrap gap-1 mt-3">
-              {item.tags.slice(0, 3).map(tag => (
-                <Badge key={tag} variant="secondary" className="text-xs">
-                  {tag}
-                </Badge>
-              ))}
-              {item.tags.length > 3 && (
-                <Badge variant="secondary" className="text-xs">
-                  +{item.tags.length - 3}
-                </Badge>
-              )}
-            </div>
-          )}
-        </CardContent>
-      </div>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleLike(item.id);
+              }}
+              className="h-7 px-2"
+            >
+              <ThumbsUp className="w-3 h-3" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleShare(item);
+              }}
+              className="h-7 px-2"
+            >
+              <Share2 className="w-3 h-3" />
+            </Button>
+          </div>
+        </div>
+      </CardContent>
     </Card>
   );
 
@@ -449,152 +435,140 @@ export default function NewsWorkspace() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8 bg-gray-50 min-h-screen">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">News & Updates</h1>
-          <p className="text-gray-600 mt-1">Stay informed with the latest industry news and company updates</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button
-            variant={viewMode === 'grid' ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setViewMode('grid')}
-          >
-            <Grid3X3 className="w-4 h-4" />
-          </Button>
-          <Button
-            variant={viewMode === 'list' ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setViewMode('list')}
-          >
-            <List className="w-4 h-4" />
-          </Button>
-        </div>
-      </div>
-
-      {/* Search and Filters */}
-      <div className="flex flex-col lg:flex-row gap-4">
-        <div className="flex-1">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-            <Input
-              placeholder="Search news articles..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
-            />
+      <div className="bg-white shadow-sm border-b">
+        <div className="max-w-7xl mx-auto px-6 py-8">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-4xl font-bold text-gray-900 mb-2">News & Updates</h1>
+              <p className="text-gray-600 text-lg">Stay informed with the latest industry insights and company news</p>
+            </div>
+            <div className="relative max-w-md">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+              <Input
+                placeholder="Search all content..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10 h-12 text-lg"
+              />
+            </div>
           </div>
         </div>
-        
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            onClick={() => setShowFilters(!showFilters)}
-            className="flex items-center gap-2"
-          >
-            <Filter className="w-4 h-4" />
-            Filters
-            {showFilters ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-          </Button>
-          
-          <select
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-md text-sm"
-          >
-            {sortOptions.map(option => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </div>
       </div>
 
-      {/* Filters Panel */}
-      {showFilters && (
-        <Card className="p-4">
-          <div className="space-y-4">
-            <div>
-              <h3 className="font-semibold mb-2">Categories</h3>
-              <div className="flex flex-wrap gap-2">
-                {categories.map(category => {
-                  const Icon = category.icon;
-                  return (
-                    <Button
-                      key={category.id}
-                      variant={selectedCategory === category.id ? 'default' : 'outline'}
-                      size="sm"
-                      onClick={() => setSelectedCategory(category.id)}
-                      className="flex items-center gap-2"
-                    >
-                      <Icon className="w-4 h-4" />
-                      {category.label}
-                    </Button>
-                  );
-                })}
-              </div>
-            </div>
-            
-            {availableTags.length > 0 && (
-              <div>
-                <h3 className="font-semibold mb-2">Tags</h3>
-                <div className="flex flex-wrap gap-2">
-                  {availableTags.map(tag => (
-                    <Button
-                      key={tag}
-                      variant={selectedTags.includes(tag) ? 'default' : 'outline'}
-                      size="sm"
-                      onClick={() => {
-                        setSelectedTags(prev => 
-                          prev.includes(tag) 
-                            ? prev.filter(t => t !== tag)
-                            : [...prev, tag]
-                        );
-                      }}
-                      className="flex items-center gap-1"
-                    >
-                      <Tag className="w-3 h-3" />
-                      {tag}
-                    </Button>
-                  ))}
+      <div className="max-w-7xl mx-auto px-6">
+        <Tabs defaultValue="highlights" className="space-y-8">
+          <TabsList className="grid w-full grid-cols-3 h-14 bg-white shadow-sm">
+            <TabsTrigger value="highlights" className="flex items-center gap-2 text-lg font-medium">
+              <Star className="w-5 h-5" />
+              Recent & Highlights
+            </TabsTrigger>
+            <TabsTrigger value="videos" className="flex items-center gap-2 text-lg font-medium">
+              <PlayCircle className="w-5 h-5" />
+              Videos
+            </TabsTrigger>
+            <TabsTrigger value="articles" className="flex items-center gap-2 text-lg font-medium">
+              <BookOpen className="w-5 h-5" />
+              Articles
+            </TabsTrigger>
+          </TabsList>
+
+          {/* Recent & Highlights Tab */}
+          <TabsContent value="highlights" className="space-y-8">
+            {filteredRecentAndHighlights.length > 0 ? (
+              <>
+                {/* Hero Section */}
+                <div className="mb-8">
+                  <HeroCard item={filteredRecentAndHighlights[0]} />
                 </div>
+                
+                {/* Other Highlights */}
+                {filteredRecentAndHighlights.length > 1 && (
+                  <div>
+                    <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-2">
+                      <Flame className="w-6 h-6 text-orange-500" />
+                      More Highlights
+                    </h2>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {filteredRecentAndHighlights.slice(1).map(item => (
+                        <LargeThumbnailCard key={item.id} item={item} />
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="text-center py-20">
+                <Star className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                <h3 className="text-xl font-semibold text-gray-600 mb-2">No highlights available</h3>
+                <p className="text-gray-500">
+                  {searchTerm ? 'No content matches your search criteria' : 'Check back soon for featured content and recent updates'}
+                </p>
               </div>
             )}
-          </div>
-        </Card>
-      )}
+          </TabsContent>
 
-      {/* News Grid/List */}
-      {filteredNews.length === 0 ? (
-        <div className="text-center py-20">
-          <Newspaper className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-          <h3 className="text-xl font-semibold text-gray-600 mb-2">No news found</h3>
-          <p className="text-gray-500">Try adjusting your search or filter criteria</p>
-        </div>
-      ) : (
-        <div className={viewMode === 'grid' 
-          ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6'
-          : 'space-y-4'
-        }>
-          {filteredNews.map(item => (
-            <NewsCard key={item.id} item={item} isGrid={viewMode === 'grid'} />
-          ))}
-        </div>
-      )}
+          {/* Videos Tab */}
+          <TabsContent value="videos" className="space-y-8">
+            <div>
+              <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-2">
+                <Video className="w-6 h-6 text-red-500" />
+                Video Content
+              </h2>
+              {filteredVideoContent.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {filteredVideoContent.map(item => (
+                    <LargeThumbnailCard key={item.id} item={item} />
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-20">
+                  <Video className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                  <h3 className="text-xl font-semibold text-gray-600 mb-2">No videos available</h3>
+                  <p className="text-gray-500">
+                    {searchTerm ? 'No videos match your search criteria' : 'Check back soon for new video content'}
+                  </p>
+                </div>
+              )}
+            </div>
+          </TabsContent>
+
+          {/* Articles Tab */}
+          <TabsContent value="articles" className="space-y-8">
+            <div>
+              <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-2">
+                <FileText className="w-6 h-6 text-blue-500" />
+                Articles
+              </h2>
+              {filteredArticleContent.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {filteredArticleContent.map(item => (
+                    <LargeThumbnailCard key={item.id} item={item} />
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-20">
+                  <FileText className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                  <h3 className="text-xl font-semibold text-gray-600 mb-2">No articles available</h3>
+                  <p className="text-gray-500">
+                    {searchTerm ? 'No articles match your search criteria' : 'Check back soon for new articles'}
+                  </p>
+                </div>
+              )}
+            </div>
+          </TabsContent>
+        </Tabs>
+      </div>
 
       {/* Article Detail Modal */}
       {selectedArticle && (
         <Dialog open={!!selectedArticle} onOpenChange={() => setSelectedArticle(null)}>
           <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <div className="flex items-center justify-between">
-                <DialogTitle className="text-2xl font-bold pr-8">
-                  {selectedArticle.title}
-                </DialogTitle>
-              </div>
+              <DialogTitle className="text-2xl font-bold pr-8">
+                {selectedArticle.title}
+              </DialogTitle>
             </DialogHeader>
             
             <div className="space-y-6">
@@ -661,7 +635,7 @@ export default function NewsWorkspace() {
 
               {/* Article Content */}
               <div className="prose max-w-none">
-                <div className="whitespace-pre-wrap text-gray-700 leading-relaxed">
+                <div className="whitespace-pre-wrap text-gray-700 leading-relaxed text-lg">
                   {selectedArticle.content}
                 </div>
               </div>
@@ -706,7 +680,7 @@ export default function NewsWorkspace() {
                   className="flex items-center gap-2"
                 >
                   <Share2 className="w-4 h-4" />
-                  Share Article
+                  Share {selectedArticle.type}
                 </Button>
               </div>
             </div>
@@ -719,7 +693,7 @@ export default function NewsWorkspace() {
         <Dialog open={showShareModal} onOpenChange={setShowShareModal}>
           <DialogContent className="max-w-md">
             <DialogHeader>
-              <DialogTitle>Share Article</DialogTitle>
+              <DialogTitle>Share {shareItem.type}</DialogTitle>
             </DialogHeader>
             
             <div className="space-y-4">
