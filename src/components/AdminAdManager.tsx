@@ -21,27 +21,19 @@ import {
   Edit,
   Trash2,
   Eye,
-  Image,
   Upload,
-  Save,
   X,
-  Star,
   Calendar,
-  User,
   Tag,
-  Globe,
   Clock,
-  DollarSign,
   TrendingUp,
   BarChart3,
   Filter,
   Search,
   MoreHorizontal,
-  Copy,
   ExternalLink,
   Settings,
   Zap,
-  AlertCircle,
   CheckCircle,
   Play,
   Pause,
@@ -49,7 +41,6 @@ import {
   Target,
   MousePointer,
   Activity,
-  FileImage,
   Loader2,
 } from "lucide-react";
 
@@ -161,11 +152,16 @@ export default function AdminAdManager() {
         .select("*")
         .order("created_at", { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase error:', error);
+        throw error;
+      }
+
+      console.log('Raw ads data from Supabase:', data);
 
       const formattedAds: AdItem[] = (data || []).map(item => ({
         id: item.id,
-        name: item.name,
+        name: item.name || 'Untitled Ad',
         description: item.description,
         company_name: item.company_name,
         company_logo: item.company_logo,
@@ -175,13 +171,13 @@ export default function AdminAdManager() {
         subheading: item.subheading,
         cta_text: item.cta_text || 'Learn More',
         target_url: item.target_url,
-        category: item.category,
-        status: item.status,
+        category: item.category || 'other',
+        status: item.status || 'draft',
         priority: item.priority || 1,
         start_date: item.start_date,
         end_date: item.end_date,
         clicks: item.clicks || 0,
-        tags: item.tags || [],
+        tags: Array.isArray(item.tags) ? item.tags : [],
         notes: item.notes,
         created_at: item.created_at,
         updated_at: item.updated_at,
@@ -192,6 +188,7 @@ export default function AdminAdManager() {
         image_url_file_name: item.image_url_file_name,
       }));
 
+      console.log('Formatted ads:', formattedAds);
       setAds(formattedAds);
     } catch (error) {
       console.error('Error loading ads:', error);
@@ -258,7 +255,10 @@ export default function AdminAdManager() {
         upsert: true,
       });
 
-    if (error) throw error;
+    if (error) {
+      console.error('Upload error:', error);
+      throw error;
+    }
 
     const { data: urlData } = supabase.storage
       .from('ad-images')
@@ -367,8 +367,6 @@ export default function AdminAdManager() {
         priority: formData.priority,
         start_date: formData.start_date ? new Date(formData.start_date).toISOString() : null,
         end_date: formData.end_date ? new Date(formData.end_date).toISOString() : null,
-        budget: formData.budget ? parseFloat(formData.budget) : null,
-        cost_per_click: formData.cost_per_click ? parseFloat(formData.cost_per_click) : null,
         tags: formData.tags
           .split(",")
           .map((tag) => tag.trim())
@@ -462,16 +460,16 @@ export default function AdminAdManager() {
     const active = ads.filter(ad => ad.status === 'active').length;
     const inactive = ads.filter(ad => ad.status === 'inactive').length;
     const scheduled = ads.filter(ad => ad.status === 'scheduled').length;
-    const totalClicks = ads.reduce((sum, ad) => sum + ad.clicks, 0);
+    const totalClicks = ads.reduce((sum, ad) => sum + (ad.clicks || 0), 0);
 
-    return { total, active, inactive, scheduled, totalClicks };
+    return { total, active, inactive, scheduled, totalClicks: totalClicks || 0 };
   };
 
   const stats = getStats();
 
   if (loading && ads.length === 0) {
     return (
-      <div className="flex items-center justify-center py-20">
+      <div className="flex items-center justify-center py-20 bg-white">
         <div className="text-center">
           <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-[#032F60] mx-auto mb-4"></div>
           <p className="text-gray-600">Loading ad management...</p>
@@ -546,21 +544,9 @@ export default function AdminAdManager() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-gray-600">Total Clicks</p>
-                    <p className="text-2xl font-bold text-purple-600">{stats.totalClicks.toLocaleString()}</p>
+                    <p className="text-2xl font-bold text-purple-600">{(stats.totalClicks || 0).toLocaleString()}</p>
                   </div>
                   <MousePointer className="h-8 w-8 text-purple-500" />
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600">Total Budget</p>
-                    <p className="text-2xl font-bold text-orange-600">${stats.totalBudget.toLocaleString()}</p>
-                  </div>
-                  <DollarSign className="h-8 w-8 text-orange-500" />
                 </div>
               </CardContent>
             </Card>
@@ -626,9 +612,17 @@ export default function AdminAdManager() {
                     <div key={ad.id} className="flex items-center justify-between p-3 border rounded-lg">
                       <div className="flex items-center gap-3">
                         {ad.company_logo ? (
-                          <img src={ad.company_logo} alt={ad.company_name} className="w-8 h-8 rounded object-cover" />
+                          <img 
+                            src={ad.company_logo} 
+                            alt={ad.company_name || 'Company logo'} 
+                            className="w-12 h-12 rounded-lg object-cover border"
+                            onError={(e) => {
+                              console.error('Failed to load company logo:', ad.company_logo);
+                              e.currentTarget.style.display = 'none';
+                            }}
+                          />
                         ) : (
-                          <Target className="h-8 w-8 text-gray-400" />
+                          <Target className="h-12 w-12 text-gray-400" />
                         )}
                         <div>
                           <p className="font-medium text-sm">{ad.name}</p>
@@ -730,8 +724,12 @@ export default function AdminAdManager() {
                         {ad.company_logo && (
                           <img 
                             src={ad.company_logo} 
-                            alt={ad.company_name} 
+                            alt={ad.company_name || 'Company logo'} 
                             className="w-12 h-12 rounded-lg object-cover border"
+                            onError={(e) => {
+                              console.error('Failed to load company logo:', ad.company_logo);
+                              e.currentTarget.style.display = 'none';
+                            }}
                           />
                         )}
                         <div className="flex-1">
@@ -749,7 +747,7 @@ export default function AdminAdManager() {
                           <div className="flex items-center gap-6 text-xs text-gray-500">
                             <div className="flex items-center gap-1">
                               <MousePointer className="h-3 w-3" />
-                              <span>{ad.clicks} clicks</span>
+                              <span>{ad.clicks || 0} clicks</span>
                             </div>
                             <div className="flex items-center gap-1">
                               <Calendar className="h-3 w-3" />
@@ -757,7 +755,7 @@ export default function AdminAdManager() {
                             </div>
                           </div>
 
-                          {ad.tags.length > 0 && (
+                          {ad.tags && ad.tags.length > 0 && (
                             <div className="flex flex-wrap gap-1 mt-3">
                               {ad.tags.slice(0, 3).map(tag => (
                                 <Badge key={tag} variant="outline" className="text-xs">
@@ -828,39 +826,6 @@ export default function AdminAdManager() {
                 </Button>
               </div>
             )}
-          </div>
-        </TabsContent>
-
-        {/* Analytics Tab */}
-        <TabsContent value="analytics" className="space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Performance Metrics</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm font-medium">Total Clicks</span>
-                    <span className="text-sm text-gray-600">
-                      {stats.totalClicks.toLocaleString()}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm font-medium">Active Campaigns</span>
-                    <span className="text-sm text-green-600">{stats.active}</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm font-medium">Scheduled Campaigns</span>
-                    <span className="text-sm text-blue-600">{stats.scheduled}</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm font-medium">Inactive Campaigns</span>
-                    <span className="text-sm text-gray-600">{stats.inactive}</span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
           </div>
         </TabsContent>
 
@@ -1238,26 +1203,38 @@ export default function AdminAdManager() {
             <div className="space-y-6">
               {/* Ad Preview */}
               <div className="relative h-40 bg-gradient-to-br from-gray-100 to-gray-200 rounded-xl shadow-lg overflow-hidden">
-                {previewAd.background_image && (
+                {previewAd.background_image ? (
                   <img
                     src={previewAd.background_image}
                     alt={previewAd.name}
                     className="w-full h-full object-cover"
+                    onError={(e) => {
+                      console.error('Failed to load background image:', previewAd.background_image);
+                      e.currentTarget.style.display = 'none';
+                    }}
                   />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-gray-400">
+                    <Target className="w-16 h-16" />
+                  </div>
                 )}
 
                 {/* Company Logo - Top Right */}
-                {previewAd.company_logo && (
+                {previewAd.company_logo ? (
                   <div className="absolute top-4 right-4">
                     <div className="w-12 h-12 bg-white rounded-lg shadow-lg flex items-center justify-center overflow-hidden">
                       <img
                         src={previewAd.company_logo}
-                        alt={previewAd.company_name}
+                        alt={previewAd.company_name || 'Company logo'}
                         className="w-10 h-10 object-contain"
+                        onError={(e) => {
+                          console.error('Failed to load company logo in preview:', previewAd.company_logo);
+                          e.currentTarget.style.display = 'none';
+                        }}
                       />
                     </div>
                   </div>
-                )}
+                ) : null}
 
                 {/* Headline - Top Left */}
                 {previewAd.headline && (
@@ -1303,7 +1280,7 @@ export default function AdminAdManager() {
                 <div>
                   <h4 className="font-semibold mb-2">Performance</h4>
                   <div className="space-y-2 text-sm">
-                    <div><strong>Clicks:</strong> {previewAd.clicks.toLocaleString()}</div>
+                    <div><strong>Clicks:</strong> {(previewAd.clicks || 0).toLocaleString()}</div>
                     <div><strong>Created:</strong> {new Date(previewAd.created_at).toLocaleDateString()}</div>
                     {previewAd.start_date && (
                       <div><strong>Start Date:</strong> {new Date(previewAd.start_date).toLocaleDateString()}</div>
@@ -1315,7 +1292,7 @@ export default function AdminAdManager() {
                 </div>
               </div>
 
-              {previewAd.tags.length > 0 && (
+              {previewAd.tags && previewAd.tags.length > 0 && (
                 <div>
                   <h4 className="font-semibold mb-2">Tags</h4>
                   <div className="flex flex-wrap gap-2">

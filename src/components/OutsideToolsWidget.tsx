@@ -110,7 +110,34 @@ const QuickAccessWidget = () => {
         .or(`is_global.eq.true,created_by.eq.${user?.id}`)
         .order('created_at', { ascending: true });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase query error:', error);
+        // Fallback to mock data if query fails
+        const mockTools: QuickAccessTool[] = [
+          {
+            id: 'fallback-1',
+            name: 'CRM System',
+            url: 'https://example.com/crm',
+            icon: 'Users',
+            icon_type: 'icon',
+            background_color: '#032F60',
+            is_global: true,
+            is_editable: false
+          },
+          {
+            id: 'fallback-2',
+            name: 'Calculator',
+            url: 'https://calculator.net',
+            icon: 'Calculator',
+            icon_type: 'icon',
+            background_color: '#27AE60',
+            is_global: true,
+            is_editable: false
+          }
+        ];
+        setTools(mockTools);
+        return;
+      }
       
       setTools(data || []);
     } catch (error) {
@@ -134,11 +161,14 @@ const QuickAccessWidget = () => {
         { 
           event: '*', 
           schema: 'public', 
-          table: 'quick_access_tools',
-          filter: `or(is_global.eq.true,created_by.eq.${user.id})`
+          table: 'quick_access_tools'
         }, 
-        () => {
-          loadTools();
+        (payload) => {
+          // Only reload if the change affects tools the user can see
+          const changedTool = payload.new || payload.old;
+          if (changedTool && (changedTool.is_global || changedTool.created_by === user.id)) {
+            loadTools();
+          }
         }
       )
       .subscribe();

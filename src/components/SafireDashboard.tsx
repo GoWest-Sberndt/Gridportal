@@ -30,13 +30,18 @@ const LendersWorkspace = React.lazy(() => import("./LendersWorkspace"));
 const SparkPointsWorkspace = React.lazy(() => import("./SparkPointsWorkspace"));
 const CompensationWorkspace = React.lazy(() => import("./CompensationWorkspace"));
 const FIREFundWorkspace = React.lazy(() => import("./FIREFundWorkspace"));
+const ProfileWorkspace = React.lazy(() => import("./profile/ProfileWorkspace"));
 
-// Simple placeholder components
-const ProfileWorkspace = () => (
-  <div className="text-center py-20 text-gray-500">
-    Profile workspace coming soon...
-  </div>
-);
+// Define tabs array
+const tabs = [
+  { id: "dashboard", label: "Dashboard", icon: BarChart3 },
+  { id: "pipeline", label: "Pipeline", icon: TrendingUp },
+  { id: "lenders", label: "Lenders", icon: Users },
+  { id: "processing", label: "Processing", icon: FileText },
+  { id: "statistics", label: "Statistics", icon: BarChart3 },
+  { id: "learning", label: "Learning", icon: GraduationCap },
+  { id: "news", label: "News", icon: Newspaper },
+];
 
 export default function SafireDashboard() {
   const { user, logout } = useAuth();
@@ -119,17 +124,6 @@ export default function SafireDashboard() {
       category: "admin" as const,
       assignedTo: "You",
     },
-  ];
-
-  // Define tabs array
-  const tabs = [
-    { id: "dashboard", label: "Dashboard", icon: BarChart3 },
-    { id: "pipeline", label: "Pipeline", icon: TrendingUp },
-    { id: "lenders", label: "Lenders", icon: Users },
-    { id: "processing", label: "Processing", icon: FileText },
-    { id: "statistics", label: "Statistics", icon: BarChart3 },
-    { id: "learning", label: "Learning", icon: GraduationCap },
-    { id: "news", label: "News", icon: Newspaper },
   ];
 
   const handleLogout = () => {
@@ -420,7 +414,9 @@ export default function SafireDashboard() {
                     )}
 
                     {activeTab === "profile" && (
-                      <ProfileWorkspace />
+                      <Suspense fallback={<div className="flex items-center justify-center py-20"><div className="text-gray-500">Loading profile...</div></div>}>
+                        <ProfileWorkspace />
+                      </Suspense>
                     )}
                   </>
                 )}

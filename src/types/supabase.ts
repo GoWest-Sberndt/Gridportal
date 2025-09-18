@@ -128,50 +128,169 @@ export type Database = {
           },
         ]
       }
-      badges: {
+      badge_collection_items: {
+        Row: {
+          badge_id: string
+          collection_id: string
+          created_at: string | null
+          id: string
+          sort_order: number | null
+        }
+        Insert: {
+          badge_id: string
+          collection_id: string
+          created_at?: string | null
+          id?: string
+          sort_order?: number | null
+        }
+        Update: {
+          badge_id?: string
+          collection_id?: string
+          created_at?: string | null
+          id?: string
+          sort_order?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "badge_collection_items_badge_id_fkey"
+            columns: ["badge_id"]
+            isOneToOne: false
+            referencedRelation: "badges"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "badge_collection_items_collection_id_fkey"
+            columns: ["collection_id"]
+            isOneToOne: false
+            referencedRelation: "badge_collections"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      badge_collections: {
         Row: {
           color: string | null
           created_at: string | null
-          criteria: string
-          description: string
-          icon: string | null
+          created_by: string | null
+          description: string | null
           id: string
           image_url: string | null
+          is_active: boolean | null
           name: string
-          rarity: string | null
-          requirements: string | null
-          reward: string | null
+          sort_order: number | null
           updated_at: string | null
         }
         Insert: {
           color?: string | null
           created_at?: string | null
-          criteria: string
-          description: string
-          icon?: string | null
+          created_by?: string | null
+          description?: string | null
           id?: string
           image_url?: string | null
+          is_active?: boolean | null
           name: string
-          rarity?: string | null
-          requirements?: string | null
-          reward?: string | null
+          sort_order?: number | null
           updated_at?: string | null
         }
         Update: {
           color?: string | null
           created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          image_url?: string | null
+          is_active?: boolean | null
+          name?: string
+          sort_order?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "badge_collections_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      badges: {
+        Row: {
+          category: string | null
+          collection_id: string | null
+          color: string | null
+          created_at: string | null
+          created_by: string | null
+          criteria: string
+          description: string
+          icon: string | null
+          id: string
+          image_url: string | null
+          is_active: boolean | null
+          name: string
+          rarity: string | null
+          requirements: string | null
+          reward: string | null
+          sort_order: number | null
+          tier: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          category?: string | null
+          collection_id?: string | null
+          color?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          criteria: string
+          description: string
+          icon?: string | null
+          id?: string
+          image_url?: string | null
+          is_active?: boolean | null
+          name: string
+          rarity?: string | null
+          requirements?: string | null
+          reward?: string | null
+          sort_order?: number | null
+          tier?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          category?: string | null
+          collection_id?: string | null
+          color?: string | null
+          created_at?: string | null
+          created_by?: string | null
           criteria?: string
           description?: string
           icon?: string | null
           id?: string
           image_url?: string | null
+          is_active?: boolean | null
           name?: string
           rarity?: string | null
           requirements?: string | null
           reward?: string | null
+          sort_order?: number | null
+          tier?: string | null
           updated_at?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "badges_collection_id_fkey"
+            columns: ["collection_id"]
+            isOneToOne: false
+            referencedRelation: "badge_collections"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "badges_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       learning_content: {
         Row: {
@@ -721,27 +840,52 @@ export type Database = {
       }
       user_badges: {
         Row: {
+          awarded_at: string | null
+          awarded_by: string | null
           badge_id: string | null
           count: number | null
           date_obtained: string | null
           id: string
+          max_progress: number | null
+          notes: string | null
+          progress: number | null
+          reason: string | null
           user_id: string | null
         }
         Insert: {
+          awarded_at?: string | null
+          awarded_by?: string | null
           badge_id?: string | null
           count?: number | null
           date_obtained?: string | null
           id?: string
+          max_progress?: number | null
+          notes?: string | null
+          progress?: number | null
+          reason?: string | null
           user_id?: string | null
         }
         Update: {
+          awarded_at?: string | null
+          awarded_by?: string | null
           badge_id?: string | null
           count?: number | null
           date_obtained?: string | null
           id?: string
+          max_progress?: number | null
+          notes?: string | null
+          progress?: number | null
+          reason?: string | null
           user_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "user_badges_awarded_by_fkey"
+            columns: ["awarded_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "user_badges_badge_id_fkey"
             columns: ["badge_id"]

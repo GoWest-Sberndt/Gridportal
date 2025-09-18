@@ -113,7 +113,7 @@ function AppContent() {
       {showSessionWarning && <SessionWarningDialog />}
 
       {/* ElevenLabs AI Chatbot Widget */}
-      <ElevenLabsWidget enabled={false} />
+      <ElevenLabsWidget enabled={true} />
 
       <Toaster />
     </>
